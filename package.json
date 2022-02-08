@@ -19,5 +19,8 @@
     "hooks": {
       "pre-commit": "yarn lint:fix"
     }
+  },
+  "dependencies": {
+    "truffle-contract-size": "^2.0.1"
   }
 }

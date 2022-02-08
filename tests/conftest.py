@@ -9,96 +9,36 @@ SPOOKY_PRICE = 11.78
 SPIRIT_PRICE = 5.78
 
 CONFIG = {
-    'USDCWFTMScreamSpooky': {
+    'USDCWFTMCRVScreamSpooky': {
         'token': '0x04068DA6C83AFCFA0e13ba15A6696662335D5B75',
         'whale': '0xe578C856933D8e1082740bf7661e379Aa2A30b26',
         'deposit': 1e6,
         'harvest_token': '0x841FAD6EAe12c286d1Fd18d1d525DFfA75C7EFFE',
         'harvest_token_price': SPOOKY_PRICE * 1e-12,
         'harvest_token_whale': '0xa48d959AE2E88f1dAA7D5F611E01908106dE7598',
-        'lp_token': '0x2b4C76d0dc16BE1C31D4C1DC53bF9B45987Fc75c',
+        'lp_token': '0xB471Ac6eF617e952b84C6a9fF5de65A9da96C93B',
         'lp_whale': '0x2b2929E785374c651a81A63878Ab22742656DcDd',
         'lp_farm': '0x2b2929E785374c651a81A63878Ab22742656DcDd',
-        'pid': 2,
+        'pid': 14,
     },
-    'USDCWFTMScreamLqdrSpooky': {
+    'USDCWFTMLINKScreamSpooky': {
         'token': '0x04068DA6C83AFCFA0e13ba15A6696662335D5B75',
         'whale': '0xe578C856933D8e1082740bf7661e379Aa2A30b26',
         'deposit': 1e6,
-        'harvest_token': '0x10b620b2dbAC4Faa7D7FFD71Da486f5D44cd86f9',
-        'harvest_token_price': LQDR_PRICE * 1e-12,
-        'harvest_token_whale': '0x3Ae658656d1C526144db371FaEf2Fff7170654eE',
-        'lp_token': '0x2b4C76d0dc16BE1C31D4C1DC53bF9B45987Fc75c',
+        'harvest_token': '0x841FAD6EAe12c286d1Fd18d1d525DFfA75C7EFFE',
+        'harvest_token_price': SPOOKY_PRICE * 1e-12,
+        'harvest_token_whale': '0xa48d959AE2E88f1dAA7D5F611E01908106dE7598',
+        'lp_token': '0x89d9bC2F2d091CfBFc31e333D6Dc555dDBc2fd29',
         'lp_whale': '0x2b2929E785374c651a81A63878Ab22742656DcDd',
-        'lp_farm': '0x6e2ad6527901c9664f016466b8DA1357a004db0f',
-        'pid': 11,
-    },
-    'USDCWFTMScreamLqdrSpirit': {
-        'token': '0x04068DA6C83AFCFA0e13ba15A6696662335D5B75',
-        'whale': '0xe578C856933D8e1082740bf7661e379Aa2A30b26',
-        'deposit': 1e6,
-        'harvest_token': '0x10b620b2dbAC4Faa7D7FFD71Da486f5D44cd86f9',
-        'harvest_token_price': LQDR_PRICE * 1e-12,
-        'harvest_token_whale': '0x3Ae658656d1C526144db371FaEf2Fff7170654eE',
-        'lp_token': '0xe7E90f5a767406efF87Fdad7EB07ef407922EC1D',
-        'lp_whale': '0x9083ea3756bde6ee6f27a6e996806fbd37f6f093',
-        'lp_farm': '0x6e2ad6527901c9664f016466b8DA1357a004db0f',
-        'pid': 5,
-    },
-    'WFTMUSDCScreamLqdrSpooky': {
-        'token': '0x39B3bd37208CBaDE74D0fcBDBb12D606295b430a',
-        'whale': '0x39B3bd37208CBaDE74D0fcBDBb12D606295b430a',
-        'deposit': 1e18,
-        'harvest_token': '0x10b620b2dbAC4Faa7D7FFD71Da486f5D44cd86f9',
-        'harvest_token_price': LQDR_PRICE,
-        'harvest_token_whale': '0x3Ae658656d1C526144db371FaEf2Fff7170654eE',
-        'lp_token': '0x2b4C76d0dc16BE1C31D4C1DC53bF9B45987Fc75c',
-        'lp_whale': '0x2b2929E785374c651a81A63878Ab22742656DcDd',
-        'lp_farm': '0x6e2ad6527901c9664f016466b8DA1357a004db0f',
-        'pid': 11,
-    },
-    'WFTMUSDCScreamLqdrSpirit': {
-        'token': '0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83',
-        'whale': '0x39B3bd37208CBaDE74D0fcBDBb12D606295b430a',
-        'deposit': 1e18,
-        'harvest_token': '0x10b620b2dbAC4Faa7D7FFD71Da486f5D44cd86f9',
-        'harvest_token_price': LQDR_PRICE,
-        'harvest_token_whale': '0x3Ae658656d1C526144db371FaEf2Fff7170654eE',
-        'lp_token': '0xe7E90f5a767406efF87Fdad7EB07ef407922EC1D',
-        'lp_whale': '0x9083ea3756bde6ee6f27a6e996806fbd37f6f093',
-        'lp_farm': '0x6e2ad6527901c9664f016466b8DA1357a004db0f',
-        'pid': 5,
-    },
-    'MIMWFTMScreamLqdrSpooky': {
-        'token': '0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83',
-        'whale': '0x2dd7C9371965472E5A5fD28fbE165007c61439E1',
-        'deposit': 1e18,
-        'harvest_token': '0x10b620b2dbAC4Faa7D7FFD71Da486f5D44cd86f9',
-        'harvest_token_price': LQDR_PRICE,
-        'harvest_token_whale': '0x3Ae658656d1C526144db371FaEf2Fff7170654eE',
-        'lp_token': '0x6f86e65b255c9111109d2D2325ca2dFc82456efc',
-        'lp_whale': '0x2639779d6CA9091483a2A7b9A1FE77Ab83b90281',
-        'lp_farm': '0x6e2ad6527901c9664f016466b8DA1357a004db0f',
-        'pid': 0x11,
-    },
-    'MIMWFTMScreamLqdrSpirit': {
-        'token': '0x82f0B8B456c1A451378467398982d4834b6829c1',
-        'whale': '0x2dd7C9371965472E5A5fD28fbE165007c61439E1',
-        'deposit': 1e18,
-        'harvest_token': '0x10b620b2dbAC4Faa7D7FFD71Da486f5D44cd86f9',
-        'harvest_token_price': LQDR_PRICE,
-        'harvest_token_whale': '0x3Ae658656d1C526144db371FaEf2Fff7170654eE',
-        'lp_token': '0xB32b31DfAfbD53E310390F641C7119b5B9Ea0488',
-        'lp_whale': '0x9083EA3756BDE6Ee6f27a6e996806FBD37F6F093',
-        'lp_farm': '0x6e2ad6527901c9664f016466b8DA1357a004db0f',
-        'pid': 0x07,
+        'lp_farm': '0x2b2929E785374c651a81A63878Ab22742656DcDd',
+        'pid': 6,
     }
 }
 
 
 @pytest.fixture
 def strategy_contract():
-    yield  project.CoreStrategyProject.WFTMUSDCScreamLqdrSpirit
+    yield  project.GenleveragelpProject.USDCWFTMLINKScreamSpooky
 
 
 @pytest.fixture

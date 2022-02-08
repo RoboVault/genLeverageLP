@@ -20,24 +20,25 @@ def test_operation(
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
 
     # check debt ratio
-    debtRatio = strategy.calcDebtRatio()
+    debtRatioA = strategy.calcDebtRatioA()
+    debtRatioB = strategy.calcDebtRatioB()
+
     collatRatio = strategy.calcCollateral()
-    print('debtRatio:   {0}'.format(debtRatio))
+    print('debtRatioA:   {0}'.format(debtRatioA))
+    print('debtRatioB:   {0}'.format(debtRatioB))
+
     print('collatRatio: {0}'.format(collatRatio))
-    assert pytest.approx(10000, rel=1e-3) == debtRatio
+    assert pytest.approx(10000, rel=1e-3) == debtRatioA
+    assert pytest.approx(10000, rel=1e-3) == debtRatioB
     assert pytest.approx(6000, rel=1e-2) == collatRatio
 
     # withdrawal
-    vault.withdraw(amount, {"from": user})
+    percentWithdrawn = 0.5
+    vault.withdraw(amount*percentWithdrawn, {"from": user})
     assert (
-        pytest.approx(token.balanceOf(user), rel=RELATIVE_APPROX) == user_balance_before
+        pytest.approx(token.balanceOf(user), rel=RELATIVE_APPROX) == user_balance_before - amount*(1-percentWithdrawn)
     )
 
-def test_lossy_withdrawal(
-    chain, accounts, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, conf
-):
-    # TODO - force a loss by stealing from the vault and trying to withdraw all
-    assert False 
 
 
 def test_emergency_exit(
@@ -185,19 +186,3 @@ def test_triggers(
     strategy.tendTrigger(0)
 
 
-
-def test_change_debt_with_price_offset(
-    chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, conf
-):
-    # todo - change the debt ratio when the oracle and lp prices have a large offset
-    assert False
-
-def test_change_debt_with_low_calcdebtratio(
-    chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, conf
-):
-    assert False 
-
-def test_change_debt_with_high_calcdebtratio(
-    chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, conf
-):
-    assert False 

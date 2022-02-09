@@ -14,152 +14,57 @@ def farmWithdraw(lp_farm, pid, strategy, amount):
 def short(strategy):
     assert Contract(strategy.short())
 
-def test_debt_rebalance(chain, accounts, token, deployed_vault, strategy, user, conf, gov, lp_token, lp_whale, lp_farm, lp_price, pid):
+def test_debt_rebalance(chain, accounts, token, deployed_vault, strategy, user, conf, gov, lp_token, lp_whale, lp_farm, lp_price, pid, Contract):
     ###################################################################
     # Test Debt Rebalance
     ###################################################################
     # Change the debt ratio to ~95% and rebalance
-    sendAmount = round(strategy.balanceLp() * (1/.95 - 1) / lp_price)
-    lp_token.transfer(strategy, sendAmount, {'from': lp_whale})
-    print('Send amount: {0}'.format(sendAmount))
-    print('debt Ratio:  {0}'.format(strategy.calcDebtRatio()))
 
-    debtRatio = strategy.calcDebtRatio()
-    collatRatioBefore = strategy.calcCollateral()
-    print('debtRatio:   {0}'.format(debtRatio))
-    print('collatRatio: {0}'.format(collatRatioBefore))
-    assert pytest.approx(9500, rel=1e-3) == debtRatio
-    assert pytest.approx(6000, rel=2e-2) == collatRatioBefore
+    # USE SPIRIT LP 
+    shortAWhale = '0xd061c6586670792331E14a80f3b3Bb267189C681'
+    shortBWhale = '0xd061c6586670792331E14a80f3b3Bb267189C681'
+    spookyRouter = Contract("0xF491e7B69E4244ad4002BC14e878a34207E38c29")
 
-    # Rebalance Debt  and check it's back to the target
-    strategy.rebalanceDebt()
-    debtRatio = strategy.calcDebtRatio()
-    print('debtRatio:   {0}'.format(debtRatio))
-    assert pytest.approx(10000, rel=1e-3) == debtRatio
-    assert pytest.approx(collatRatioBefore, rel=1e-2) == strategy.calcCollateral()
+    shortA = Contract(strategy.shortA())
+    shortB = Contract(strategy.shortB())
+    swapAmt = shortA.balanceOf(lp_token)*0.05
 
-    # Change the debt ratio to ~40% and rebalance
-    # sendAmount = round(strategy.balanceLpInShort() * (1/.4 - 1))
-    sendAmount = round(strategy.balanceLp() * (1/.4 - 1) / lp_price)
-    lp_token.transfer(strategy, sendAmount, {'from': lp_whale})
-    print('Send amount: {0}'.format(sendAmount))
-    print('debt Ratio:  {0}'.format(strategy.calcDebtRatio()))
+    print("Force Large Swap - to offset debt ratios")
 
-    debtRatio = strategy.calcDebtRatio()
-    collatRatioBefore = strategy.calcCollateral()
-    print('debtRatio:   {0}'.format(debtRatio))
-    print('collatRatio: {0}'.format(collatRatioBefore))
-    assert pytest.approx(4000, rel=1e-3) == debtRatio
-    assert pytest.approx(6000, rel=2e-2) == collatRatioBefore
+    shortA.approve(spookyRouter, 2**256-1, {"from": shortAWhale})
+    spookyRouter.swapExactTokensForTokens(swapAmt, 0, [shortA, shortB], shortAWhale, 2**256-1, {"from": shortAWhale})
+
+    print('debt Ratio A :  {0}'.format(strategy.calcDebtRatioA()))
+    print('debt Ratio B :  {0}'.format(strategy.calcDebtRatioB()))
+
+    print("Complete Rebalance")
 
     # Rebalance Debt  and check it's back to the target
     strategy.rebalanceDebt()
-    debtRatio = strategy.calcDebtRatio()
-    print('debtRatio:   {0}'.format(debtRatio))
-    assert pytest.approx(10000, rel=1e-3) == debtRatio 
-    assert pytest.approx(collatRatioBefore, rel=1e-2) == strategy.calcCollateral()
+    print('debt Ratio A :  {0}'.format(strategy.calcDebtRatioA()))
+    print('debt Ratio B :  {0}'.format(strategy.calcDebtRatioB()))
 
-    # Change the debt ratio to ~105% and rebalance - steal some lp from the strat
-    sendAmount = round(strategy.balanceLp() * 0.05/1.05 / lp_price)
-    auth = accounts.at(strategy, True)
-    farmWithdraw(lp_farm, pid, strategy, sendAmount)
-    lp_token.transfer(user, sendAmount, {'from': auth})
+    assert pytest.approx(10000, rel=1e-2) == strategy.calcDebtRatioA()
+    assert pytest.approx(10000, rel=1e-2) == strategy.calcDebtRatioB()
 
-    print('Send amount: {0}'.format(sendAmount))
-    print('debt Ratio:  {0}'.format(strategy.calcDebtRatio()))
 
-    debtRatio = strategy.calcDebtRatio()
-    collatRatioBefore = strategy.calcCollateral()
-    print('debtRatio:   {0}'.format(debtRatio))
-    print('collatRatio: {0}'.format(collatRatioBefore))
-    assert pytest.approx(10500, rel=2e-3) == debtRatio
-    assert pytest.approx(6000, rel=2e-2) == collatRatioBefore
+    swapAmt = shortB.balanceOf(lp_token)*0.05
 
-    # Rebalance Debt  and check it's back to the target
-    strategy.rebalanceDebt()
-    debtRatio = strategy.calcDebtRatio()
-    print('debtRatio:   {0}'.format(debtRatio))
-    assert pytest.approx(10000, rel=2e-3) == debtRatio
-    assert pytest.approx(collatRatioBefore, rel=1e-2) == strategy.calcCollateral()
+    print("Force Large Swap - to offset debt ratios Other Direction")
 
-    # Change the debt ratio to ~150% and rebalance - steal some lp from the strat
-    # sendAmount = round(strategy.balanceLpInShort()*(1 - 1/1.50))
-    sendAmount = round(strategy.balanceLp() * 0.5/1.50 / lp_price)
-    auth = accounts.at(strategy, True)
-    farmWithdraw(lp_farm, pid, strategy, sendAmount)
-    lp_token.transfer(user, sendAmount, {'from': auth})
+    shortB.approve(spookyRouter, 2**256-1, {"from": shortBWhale})
+    spookyRouter.swapExactTokensForTokens(swapAmt, 0, [shortB, shortA], shortAWhale, 2**256-1, {"from": shortAWhale})
 
-    print('Send amount: {0}'.format(sendAmount))
-    print('debt Ratio:  {0}'.format(strategy.calcDebtRatio()))
+    print('debt Ratio A :  {0}'.format(strategy.calcDebtRatioA()))
+    print('debt Ratio B :  {0}'.format(strategy.calcDebtRatioB()))
 
-    debtRatio = strategy.calcDebtRatio()
-    collatRatioBefore = strategy.calcCollateral()
-    print('debtRatio:   {0}'.format(debtRatio))
-    print('collatRatio: {0}'.format(collatRatioBefore))
-    assert pytest.approx(15000, rel=2e-3) == debtRatio
-    assert pytest.approx(6000, rel=2e-2) == collatRatioBefore
+
+    print("Complete Rebalance")
 
     # Rebalance Debt  and check it's back to the target
     strategy.rebalanceDebt()
-    debtRatio = strategy.calcDebtRatio()
-    print('debtRatio:   {0}'.format(debtRatio))
-    assert pytest.approx(10000, rel=2e-3) == debtRatio
-    assert pytest.approx(collatRatioBefore, rel=1e-2) == strategy.calcCollateral()
+    print('debt Ratio A :  {0}'.format(strategy.calcDebtRatioA()))
+    print('debt Ratio B :  {0}'.format(strategy.calcDebtRatioB()))
 
-
-def test_debt_rebalance_partial(chain, accounts, token, deployed_vault, strategy, user, strategist, gov, lp_token, lp_whale, lp_farm, lp_price, pid):
-    strategy.setDebtThresholds(9800, 10200, 5000)
-
-    # Change the debt ratio to ~95% and rebalance
-    sendAmount = round(strategy.balanceLpInShort()*(1/.95 - 1))
-    lp_token.transfer(strategy, sendAmount, {'from': lp_whale})
-    print('Send amount: {0}'.format(sendAmount))
-    print('debt Ratio:  {0}'.format(strategy.calcDebtRatio()))
-
-    debtRatio = strategy.calcDebtRatio()
-    collatRatioBefore = strategy.calcCollateral()
-    print('debtRatio:   {0}'.format(debtRatio))
-    print('collatRatio: {0}'.format(collatRatioBefore))
-    assert pytest.approx(9500, rel=1e-3) == debtRatio
-    assert pytest.approx(6000, rel=1e-3) == collatRatioBefore
-
-    # Rebalance Debt  and check it's back to the target
-    strategy.rebalanceDebt()
-    debtRatio = strategy.calcDebtRatio()
-    collatRatio = strategy.calcCollateral()
-    print('debtRatio:   {0}'.format(debtRatio))
-    print('collatRatio: {0}'.format(collatRatio))
-    assert pytest.approx(9750, rel=1e-3) == debtRatio
-    assert pytest.approx(6000, rel=1e-3) == collatRatio
-
-    # rebalance the whole way now
-    strategy.setDebtThresholds(9800, 10200, 10000)
-    strategy.rebalanceDebt()
-    assert pytest.approx(10000, rel=1e-3) == strategy.calcDebtRatio()
-    assert pytest.approx(6000, rel=1e-3) == strategy.calcCollateral()
-
-    strategy.setDebtThresholds(9800, 10200, 5000)
-    # Change the debt ratio to ~105% and rebalance - steal some lp from the strat
-    sendAmount = round(strategy.balanceLp() * 0.05/1.05 / lp_price)
-    auth = accounts.at(strategy, True)
-    farmWithdraw(lp_farm, pid, strategy, sendAmount)
-    lp_token.transfer(user, sendAmount, {'from': auth})
-
-    print('Send amount: {0}'.format(sendAmount))
-    print('debt Ratio:  {0}'.format(strategy.calcDebtRatio()))
-    debtRatio = strategy.calcDebtRatio()
-    collatRatioBefore = strategy.calcCollateral()
-    print('debtRatio:   {0}'.format(debtRatio))
-    print('CollatRatio: {0}'.format(collatRatioBefore))
-    assert pytest.approx(10500, rel=1e-3) == debtRatio
-    assert pytest.approx(6000, rel=1e-3) == collatRatioBefore
-
-    # Rebalance Debt  and check it's back to the target
-    strategy.rebalanceDebt()
-    collatRatio = strategy.calcCollateral()
-    debtRatio = strategy.calcDebtRatio()
-    print('debtRatio:   {0}'.format(debtRatio))
-    print('CollatRatio: {0}'.format(collatRatio))
-    assert pytest.approx(10250, rel=1e-3) == debtRatio
-    assert pytest.approx(6000, rel=1e-3) == collatRatio
-    
+    assert pytest.approx(10000, rel=1e-2) == strategy.calcDebtRatioA()
+    assert pytest.approx(10000, rel=1e-2) == strategy.calcDebtRatioB()

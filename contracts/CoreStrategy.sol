@@ -89,9 +89,9 @@ abstract contract CoreStrategy is BaseStrategy {
 
     // uint256 public stratLendAllocation;
     // uint256 public stratDebtAllocation;
-    uint256 public collatUpper = 6700;
-    uint256 public collatTarget = 6000;
-    uint256 public collatLower = 5300;
+    uint256 public collatUpper = 5500;
+    uint256 public collatTarget = 5000;
+    uint256 public collatLower = 4500;
     uint256 public debtUpper = 10200;
     uint256 public debtLower = 9800;
     uint256 public rebalancePercent = 10000; // 100% (how far does rebalance of debt move towards 100% from threshold)
@@ -122,10 +122,10 @@ abstract contract CoreStrategy is BaseStrategy {
     IPriceOracle oracleA;
     IPriceOracle oracleB;
 
-    IStrategyInsurance public insurance;
-
-    uint256 public slippageAdj = 9500; // 95%
+    uint256 public slippageAdj = 9000; // 90%
     uint256 public slippageAdjHigh = 10100; // 101%
+    /// HACK for harvest logic
+    uint256 public pendingFarmRewards = 10000;
 
     uint256 constant BASIS_PRECISION = 10000;
     uint256 constant STD_PRECISION = 1e18;
@@ -195,7 +195,6 @@ abstract contract CoreStrategy is BaseStrategy {
             uint256 _debtPayment
         )
     {
-        // TO DO ADD PENDING HARVEST LOGIC
         if (canHarvest()) {
             _harvestInternal();
         }
@@ -217,28 +216,6 @@ abstract contract CoreStrategy is BaseStrategy {
             _withdraw(_debtOutstanding);
             _debtPayment = balanceOfWant();
             _loss = totalDebt.sub(totalAssets);
-        }
-
-        // Check if we're net loss or net profit
-        if (_loss >= _profit) {
-            _profit = 0;
-            _loss = _loss.sub(_profit);
-            insurance.reportLoss(totalDebt, _loss);
-        } else {
-            _profit = _profit.sub(_loss);
-            _loss = 0;
-            uint256 insurancePayment =
-                insurance.reportProfit(totalDebt, _profit);
-            _profit = _profit.sub(insurancePayment);
-
-            // double check insurance isn't asking for too much or zero
-            if (insurancePayment > 0 && insurancePayment < _profit) {
-                SafeERC20.safeTransfer(
-                    want,
-                    address(insurance),
-                    insurancePayment
-                );
-            }
         }
     }
 
@@ -342,11 +319,6 @@ abstract contract CoreStrategy is BaseStrategy {
         slippageAdjHigh = _upper;
     }
 
-    function setInsurance(address _insurance) external onlyGovernance {
-        require(address(insurance) == address(0));
-        insurance = IStrategyInsurance(_insurance);
-    }
-
     /*
     function migrateInsurance(address _newInsurance) external onlyGovernance {
         require(address(_newInsurance) == address(0));
@@ -446,7 +418,11 @@ abstract contract CoreStrategy is BaseStrategy {
 
     // TO DO SET SOME RULES ON WHEN TO CALL _harvestInternal
     function canHarvest() internal view returns (bool) {
-        return (false);
+        return (estimatedTotalAssets() > _getTotalDebt() ||
+            _farmPendingRewards(farmPid, address(this)).add(
+                farmToken.balanceOf(address(this))
+            ) >
+            pendingFarmRewards);
     }
 
     /// called by keeper to harvest rewards and either repay debt
@@ -456,35 +432,42 @@ abstract contract CoreStrategy is BaseStrategy {
         claimHarvest();
         comptroller.claimComp(address(this));
         uint256 maxDebt = Math.max(calcDebtRatioA(), calcDebtRatioB());
+
+        // decide which token to sell rewards to
+        address sellToken = address(want);
         if (maxDebt > BASIS_PRECISION) {
             if (calcDebtRatioA() > calcDebtRatioB()) {
-                _sellHarvest(address(shortA));
-                _sellComp(address(shortA));
-                _repayDebtA();
+                sellToken = address(shortA);
             } else {
-                _sellHarvest(address(shortB));
-                _sellComp(address(shortB));
-                _repayDebtB();
+                sellToken = address(shortB);
             }
-        } else {
-            _sellTradingFees();
-            _sellHarvest(address(want));
-            _sellComp(address(want));
         }
-
+        _sellHarvest(sellToken);
+        _sellComp(sellToken);
+        _repayDebtA();
+        _repayDebtB();
         _wantHarvested = balanceOfWant().sub(wantBefore);
     }
 
     // if debt ratio debtLower for both short A & short B convert some of the trading fees to want to get closer to hedged position
-    function _sellTradingFees() internal {
-        if (calcDebtRatioA() < debtLower && calcDebtRatioB() < debtLower) {
+    function sellTradingFees() external onlyKeepers {
+        uint256 debtA = calcDebtRatioA();
+        uint256 debtB = calcDebtRatioB();
+
+        if (debtA < debtLower && debtB < debtLower) {
             uint256 lpPercentRemove =
-                BASIS_PRECISION.sub(
-                    Math.max(calcDebtRatioA(), calcDebtRatioB())
-                );
+                BASIS_PRECISION.sub(Math.max(debtA, debtB));
             _removeLpPercent(lpPercentRemove);
-            _swapExactShortAWant(balanceShortA());
-            _swapExactShortBWant(balanceShortB());
+            _swapExactShortRebalance(
+                address(shortA),
+                address(want),
+                balanceShortA()
+            );
+            _swapExactShortRebalance(
+                address(shortB),
+                address(want),
+                balanceShortB()
+            );
         }
     }
 
@@ -511,8 +494,8 @@ abstract contract CoreStrategy is BaseStrategy {
 
         if (collatRatio > collatTarget) {
             uint256 percentRemoved =
-                (collatRatio.mul(rebalancePercent).div(collatTarget)).sub(
-                    BASIS_PRECISION
+                (collatRatio.sub(collatTarget)).mul(BASIS_PRECISION).div(
+                    collatRatio
                 );
             _removeLpPercent(percentRemoved);
             _repayDebtA();
@@ -520,8 +503,8 @@ abstract contract CoreStrategy is BaseStrategy {
             //emit CollatRebalance(collatRatio, percentRemoved);
         } else if (collatRatio < collatTarget) {
             uint256 percentAdded =
-                (collatTarget.mul(rebalancePercent).div(collatTarget)).sub(
-                    BASIS_PRECISION
+                (collatTarget.sub(collatRatio)).mul(BASIS_PRECISION).div(
+                    collatRatio
                 );
             _borrowA(
                 balanceShortAinLP().mul(percentAdded).div(BASIS_PRECISION)
@@ -570,19 +553,20 @@ abstract contract CoreStrategy is BaseStrategy {
     function _deployFromLend(uint256 _amount) internal {
         uint256 collatAdj = collatTarget.sub(calcCollateral());
 
-        uint256 _borrowAmtA =
-            balanceLend()
+        uint256 borrowAmtA =
+            _amount
                 .mul(collatAdj)
+                .div(BASIS_PRECISION)
                 .mul(1e18)
-                .div((oracleA.getPrice()))
+                .div(oracleA.getPrice())
                 .div(2);
-        uint256 _borrowAmtB =
-            _borrowAmtA.mul(shortB.balanceOf(address(shortAshortBLP))).div(
+        uint256 borrowAmtB =
+            borrowAmtA.mul(shortB.balanceOf(address(shortAshortBLP))).div(
                 shortA.balanceOf(address(shortAshortBLP))
             );
 
-        _borrowA(_borrowAmtA);
-        _borrowB(_borrowAmtB);
+        _borrowA(borrowAmtA);
+        _borrowB(borrowAmtB);
         _addToLP();
         _depoistLp();
     }
@@ -611,18 +595,19 @@ abstract contract CoreStrategy is BaseStrategy {
 
         if (debtRatioA > debtUpper) {
             // If there's excess debt in shortA, we swap some of ShortB to repay a portion of the debt
-            swapPercent = debtInShortA.mul(rebalancePercent).div(balShortA);
+
+            swapPercent = rebalancePercent;
             swapAmt = balShortB.mul(swapPercent).div(BASIS_PRECISION);
             _swapExactShortRebalance(address(shortB), address(shortA), swapAmt);
             _repayDebtA();
         } else {
-            swapPercent = debtInShortB.mul(rebalancePercent).div(balShortB);
+            swapPercent = rebalancePercent;
             swapAmt = balShortA.mul(swapPercent).div(BASIS_PRECISION);
             _swapExactShortRebalance(address(shortA), address(shortB), swapAmt);
             _repayDebtB();
         }
 
-        _deployFromLend(estimatedTotalAssets());
+        _deployFromLend(balanceLend());
         //emit DebtRebalance(debtRatioA, debtRatioB, swapPercent);
     }
 
@@ -695,6 +680,7 @@ abstract contract CoreStrategy is BaseStrategy {
         internal
         returns (uint256 _liquidatedAmount, uint256 _loss)
     {
+        uint256 balanceBefore = estimatedTotalAssets();
         uint256 balanceWant = balanceOfWant();
         if (_amountNeeded <= balanceWant) {
             return (0, 0);
@@ -712,6 +698,8 @@ abstract contract CoreStrategy is BaseStrategy {
         _repayDebtA();
         _repayDebtB();
         _redeemWant(_amountNeeded);
+        _loss = balanceBefore.sub(estimatedTotalAssets());
+        _liquidatedAmount = balanceOfWant().sub(balanceWant);
     }
 
     function enterMarket() internal onlyAuthorized {
@@ -783,6 +771,18 @@ abstract contract CoreStrategy is BaseStrategy {
     {
         (uint256 wantInLp, uint256 shortInLp, ) = wantShortALP.getReserves();
         return (_amountShort.mul(wantInLp).div(shortInLp));
+    }
+
+    function convertShortBToWantLP(uint256 _amountShort)
+        internal
+        view
+        returns (uint256)
+    {
+        convertShortAToWantLP(
+            _amountShort.mul(shortA.balanceOf(address(shortAshortBLP))).div(
+                shortB.balanceOf(address(shortAshortBLP))
+            )
+        );
     }
 
     function convertShortAToWantOracle(uint256 _amountShort)
@@ -864,22 +864,6 @@ abstract contract CoreStrategy is BaseStrategy {
         return cTokenBorrowB.borrowBalanceCurrent(address(this));
     }
 
-    /*
-    function balancePendingHarvest() public view virtual returns (uint256) {
-        uint256 rewardsPending =
-            _farmPendingRewards(farmPid, address(this)).add(
-                farmToken.balanceOf(address(this))
-            );
-        uint256 harvestLP_A = _getHarvestInHarvestLp();
-        uint256 shortLP_A = _getShortInHarvestLp();
-        (uint256 wantLP_B, uint256 shortLP_B) = getLpReserves();
-
-        uint256 balShort = rewardsPending.mul(shortLP_A).div(harvestLP_A);
-        uint256 balRewards = balShort.mul(wantLP_B).div(shortLP_B);
-        return (balRewards);
-    }
-    */
-
     // reserves
     function balanceOfWant() public view returns (uint256) {
         return (want.balanceOf(address(this)));
@@ -906,7 +890,7 @@ abstract contract CoreStrategy is BaseStrategy {
         return want.balanceOf(address(cTokenLend));
     }
 
-    function countLpPooled() internal view virtual returns (uint256) {
+    function countLpPooled() public view virtual returns (uint256) {
         return farm.userInfo(farmPid, address(this)).amount;
     }
 
@@ -1065,37 +1049,29 @@ abstract contract CoreStrategy is BaseStrategy {
         );
     }
 
-    function _swapExactShortAWant(uint256 _amountShort)
+    /*
+    function _swapExactShortWant(uint256 _amountShort, address _short)
         internal
         returns (uint256 _amountWant, uint256 _slippageWant)
     {
-        _amountWant = convertShortAToWantOracle(_amountShort);
-        uint256[] memory amounts =
-            router.swapExactTokensForTokens(
-                _amountShort,
-                _amountWant.mul(slippageAdj).div(BASIS_PRECISION),
-                getTokenOutPath(address(shortB), address(want)),
-                address(this),
-                now
-            );
-        _slippageWant = _amountWant.sub(amounts[amounts.length - 1]);
-    }
+        if (_short == address(shortA)){
+            _amountWant = convertShortAToWantLP(_amountShort);
+        } else {
+            _amountWant = convertShortBToWantLP(_amountShort);
+        }
+        
 
-    function _swapExactShortBWant(uint256 _amountShort)
-        internal
-        returns (uint256 _amountWant, uint256 _slippageWant)
-    {
-        _amountWant = convertShortBToWantOracle(_amountShort);
         uint256[] memory amounts =
             router.swapExactTokensForTokens(
                 _amountShort,
                 _amountWant.mul(slippageAdj).div(BASIS_PRECISION),
-                getTokenOutPath(address(shortA), address(want)),
+                getTokenOutPath(_short, address(want)),
                 address(this),
                 now
             );
         _slippageWant = _amountWant.sub(amounts[amounts.length - 1]);
     }
+    */
 
     function protectedTokens()
         internal

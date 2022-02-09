@@ -29,7 +29,7 @@ CONFIG = {
         'harvest_token_price': SPOOKY_PRICE * 1e-12,
         'harvest_token_whale': '0xa48d959AE2E88f1dAA7D5F611E01908106dE7598',
         'lp_token': '0x89d9bC2F2d091CfBFc31e333D6Dc555dDBc2fd29',
-        'lp_whale': '0x2b2929E785374c651a81A63878Ab22742656DcDd',
+        'lp_whale': '0x7F41312B5D2D31D49482F31C9a53e6485Df37E1D',
         'lp_farm': '0x2b2929E785374c651a81A63878Ab22742656DcDd',
         'pid': 6,
     }
@@ -128,7 +128,7 @@ def strategy(strategist, keeper, vault, strategy_contract, gov):
     strategy = strategist.deploy(strategy_contract, vault)
     insurance = strategist.deploy(StrategyInsurance, strategy)
     strategy.setKeeper(keeper)
-    strategy.setInsurance(insurance, {'from': gov})
+    #strategy.setInsurance(insurance, {'from': gov})
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
     yield strategy
 

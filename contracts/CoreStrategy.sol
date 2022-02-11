@@ -281,6 +281,7 @@ abstract contract CoreStrategy is BaseStrategy {
         shortB.safeApprove(address(cTokenBorrowB), uint256(-1));
 
         //want.safeApprove(address(router), uint256(-1));
+        want.safeApprove(address(router), uint256(-1));
         shortA.safeApprove(address(router), uint256(-1));
         shortB.safeApprove(address(router), uint256(-1));
 
@@ -299,6 +300,7 @@ abstract contract CoreStrategy is BaseStrategy {
         shortB.safeApprove(address(cTokenBorrowB), uint256(0));
 
         //want.safeApprove(address(router), uint256(-1));
+        want.safeApprove(address(router), uint256(0));
         shortA.safeApprove(address(router), uint256(0));
         shortB.safeApprove(address(router), uint256(0));
 
@@ -380,21 +382,43 @@ abstract contract CoreStrategy is BaseStrategy {
         internal
         returns (uint256 _amountFreed, uint256 _loss)
     {
-        _withdrawAllPooled();
-        _removeAllLp();
-        _repayDebtA();
-        _repayDebtB();
 
-        uint256 debtInShortA = balanceDebtInShortACurrent();
-        uint256 debtInShortB = balanceDebtInShortBCurrent();
+        uint256 totalDebt = _getTotalDebt();
+        liquidateAllToLend();
+
+        uint256 debtInShortA = balanceDebtInShortA();
+        uint256 debtInShortB = balanceDebtInShortB();
 
         uint256 balShortA = balanceShortA();
         uint256 balShortB = balanceShortB();
 
-        // TO DO ADD LOGIC TO REPAY REMAINING DEBTS + CONVERT EXCESS SHORT A & SHORT B to WANT
+        // not most efficient solution for slippage but should save on gas 
+        // first redeem enough Want to repay debt (if no debt try to swap for Want)
+        uint256 redeemAmount = totalDebt.div(10);
+        _redeemWant(redeemAmount);
+
+
+        if (debtInShortA > 0) {
+            swapExactOutFromTo(address(want), address(shortA), debtInShortA);
+            _repayDebtA();
+        } else {
+            swapExactFromTo(address(shortA), address(want), balShortA);
+        }
+
+        if (debtInShortB > 0) {
+            swapExactOutFromTo(address(want), address(shortB), debtInShortB);
+            _repayDebtB();
+        } else {
+            swapExactFromTo(address(shortB), address(want), balShortB);
+        }
 
         _redeemWant(balanceLend());
         _amountFreed = balanceOfWant();
+        _loss = 0;
+        if (totalDebt > _amountFreed){
+            _loss = totalDebt.sub(_amountFreed);
+        }
+        
     }
 
     /// rebalances RoboVault strat position to within target collateral range
@@ -442,8 +466,9 @@ abstract contract CoreStrategy is BaseStrategy {
                 sellToken = address(shortB);
             }
         }
-        _sellHarvest(sellToken);
-        _sellComp(sellToken);
+        swapExactFromTo(address(compToken), sellToken, compToken.balanceOf(address(this)));
+        swapExactFromTo(address(farmToken), sellToken, farmToken.balanceOf(address(this)));
+
         _repayDebtA();
         _repayDebtB();
         _wantHarvested = balanceOfWant().sub(wantBefore);
@@ -458,12 +483,12 @@ abstract contract CoreStrategy is BaseStrategy {
             uint256 lpPercentRemove =
                 BASIS_PRECISION.sub(Math.max(debtA, debtB));
             _removeLpPercent(lpPercentRemove);
-            _swapExactShortRebalance(
+            swapExactFromTo(
                 address(shortA),
                 address(want),
                 balanceShortA()
             );
-            _swapExactShortRebalance(
+            swapExactFromTo(
                 address(shortB),
                 address(want),
                 balanceShortB()
@@ -572,19 +597,13 @@ abstract contract CoreStrategy is BaseStrategy {
     }
 
     function _rebalanceDebtInternal() internal {
-        uint256 swapPercent;
+        // this will be the % of balance for either short A or short B swapped 
         uint256 swapAmt;
+        uint256 lpRemovePercent;
         uint256 debtRatioA = calcDebtRatioA();
         uint256 debtRatioB = calcDebtRatioB();
+        (uint256 _shortAInLP, uint256 _shortBInLP) = getLpReserves();
 
-        // Liquidate all the lend, leaving some in debt or as short
-        liquidateAllToLend();
-
-        uint256 debtInShortA = balanceDebtInShortA();
-        uint256 balShortA = balanceShortA();
-
-        uint256 debtInShortB = balanceDebtInShortB();
-        uint256 balShortB = balanceShortB();
 
         /* 
         Technically it's possible for both debtratioA & debtratioB to > debtUpper 
@@ -593,21 +612,21 @@ abstract contract CoreStrategy is BaseStrategy {
         to token with highest debt Ratio 
         */
 
-        if (debtRatioA > debtUpper) {
-            // If there's excess debt in shortA, we swap some of ShortB to repay a portion of the debt
-
-            swapPercent = rebalancePercent;
-            swapAmt = balShortB.mul(swapPercent).div(BASIS_PRECISION);
-            _swapExactShortRebalance(address(shortB), address(shortA), swapAmt);
+        if (debtRatioA > debtRatioB) {
+            lpRemovePercent = (debtRatioA.sub(debtRatioB)).div(2);
+            _removeLpPercent(lpRemovePercent);
+            swapExactFromTo(address(shortB), address(shortA), balanceShortB());
             _repayDebtA();
-        } else {
-            swapPercent = rebalancePercent;
-            swapAmt = balShortA.mul(swapPercent).div(BASIS_PRECISION);
-            _swapExactShortRebalance(address(shortA), address(shortB), swapAmt);
+        }
+
+        if (debtRatioB > debtRatioA) {
+            lpRemovePercent = (debtRatioB.sub(debtRatioA)).div(2);
+            _removeLpPercent(lpRemovePercent);
+            swapExactFromTo(address(shortA), address(shortB), balanceShortA());
             _repayDebtB();
         }
 
-        _deployFromLend(balanceLend());
+
         //emit DebtRebalance(debtRatioA, debtRatioB, swapPercent);
     }
 
@@ -680,7 +699,7 @@ abstract contract CoreStrategy is BaseStrategy {
         internal
         returns (uint256 _liquidatedAmount, uint256 _loss)
     {
-        uint256 balanceBefore = estimatedTotalAssets();
+        uint256 totalDebt = _getTotalDebt();
         uint256 balanceWant = balanceOfWant();
         if (_amountNeeded <= balanceWant) {
             return (0, 0);
@@ -693,13 +712,19 @@ abstract contract CoreStrategy is BaseStrategy {
             _amountNeeded.sub(balanceWant).mul(BASIS_PRECISION).div(
                 balanceDeployed
             );
+        if (stratPercent > 9500) {
+            (_liquidatedAmount, _loss) = liquidateAllPositionsInternal();
+            _liquidatedAmount = Math.min(_liquidatedAmount, _amountNeeded);
+        } else {
+            _removeLpPercent(stratPercent);
+            _repayDebtA();
+            _repayDebtB();
+            _redeemWant(_amountNeeded);
+            _loss = totalDebt.sub(estimatedTotalAssets());
+            _liquidatedAmount = balanceOfWant().sub(balanceWant);
+        }
 
-        _removeLpPercent(stratPercent);
-        _repayDebtA();
-        _repayDebtB();
-        _redeemWant(_amountNeeded);
-        _loss = balanceBefore.sub(estimatedTotalAssets());
-        _liquidatedAmount = balanceOfWant().sub(balanceWant);
+
     }
 
     function enterMarket() internal onlyAuthorized {
@@ -806,12 +831,6 @@ abstract contract CoreStrategy is BaseStrategy {
         uint256 balA = convertShortAToWantLP(balanceShortAinLP());
         // as we are using UNI V2 can assume that short B will convert to want @ same value i.e. multiply by 2
         return (balA.mul(2));
-    }
-
-    function balanceLpOracle() public view returns (uint256) {
-        uint256 balA = balanceShortAinLP().mul(oracleA.getPrice()).div(1e18);
-        uint256 balB = balanceShortBinLP().mul(oracleB.getPrice()).div(1e18);
-        return (balA.add(balB));
     }
 
     function balanceShortAinLP() public view returns (uint256) {
@@ -1007,38 +1026,15 @@ abstract contract CoreStrategy is BaseStrategy {
         );
     }
 
-    function _sellHarvest(address _target) internal virtual {
-        uint256 harvestBalance = farmToken.balanceOf(address(this));
-        if (harvestBalance == 0) return;
-        router.swapExactTokensForTokens(
-            harvestBalance,
-            0,
-            getTokenOutPath(address(farmToken), address(_target)),
-            address(this),
-            now
-        );
-    }
-
-    /**
-     * Harvest comp token from the lending platform and swap for the want token
-     */
-    function _sellComp(address _target) internal virtual {
-        uint256 compBalance = compToken.balanceOf(address(this));
-        if (compBalance == 0) return;
-        router.swapExactTokensForTokens(
-            compBalance,
-            0,
-            getTokenOutPath(address(compToken), address(_target)),
-            address(this),
-            now
-        );
-    }
-
-    function _swapExactShortRebalance(
+    function swapExactFromTo(
         address _swapFrom,
         address _swapTo,
         uint256 _amountShort
     ) internal {
+        IERC20 fromToken = IERC20(_swapFrom);
+        uint256 fromBalance = fromToken.balanceOf(address(this));
+        if (fromBalance == 0) return;
+
         uint256 minOut = 0;
         router.swapExactTokensForTokens(
             _amountShort,
@@ -1049,29 +1045,24 @@ abstract contract CoreStrategy is BaseStrategy {
         );
     }
 
-    /*
-    function _swapExactShortWant(uint256 _amountShort, address _short)
-        internal
-        returns (uint256 _amountWant, uint256 _slippageWant)
-    {
-        if (_short == address(shortA)){
-            _amountWant = convertShortAToWantLP(_amountShort);
-        } else {
-            _amountWant = convertShortBToWantLP(_amountShort);
-        }
-        
+    function swapExactOutFromTo(
+        address _swapFrom,
+        address _swapTo,
+        uint256 _amountOut
+    ) internal {
+        IERC20 fromToken = IERC20(_swapFrom);
+        uint256 fromBalance = fromToken.balanceOf(address(this));
+        if (fromBalance == 0) return;
 
-        uint256[] memory amounts =
-            router.swapExactTokensForTokens(
-                _amountShort,
-                _amountWant.mul(slippageAdj).div(BASIS_PRECISION),
-                getTokenOutPath(_short, address(want)),
-                address(this),
-                now
-            );
-        _slippageWant = _amountWant.sub(amounts[amounts.length - 1]);
+        uint256 maxIn = fromBalance;
+        router.swapTokensForExactTokens(
+            _amountOut,
+            maxIn,
+            getTokenOutPath(address(_swapFrom), address(_swapTo)),
+            address(this),
+            now
+        );
     }
-    */
 
     function protectedTokens()
         internal

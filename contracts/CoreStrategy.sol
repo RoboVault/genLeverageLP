@@ -450,28 +450,34 @@ abstract contract CoreStrategy is BaseStrategy {
     }
 
     /// called by keeper to harvest rewards and either repay debt
-    function _harvestInternal() internal returns (uint256 _wantHarvested) {
+    function _harvestInternal() internal {
         uint256 wantBefore = balanceOfWant();
         /// harvest from farm & wantd on amt borrowed vs LP value either -> repay some debt or add to collateral
         claimHarvest();
         comptroller.claimComp(address(this));
-        uint256 maxDebt = Math.max(calcDebtRatioA(), calcDebtRatioB());
+        uint256 debtA = calcDebtRatioA();
+        uint256 debtB = calcDebtRatioB();
+
+        uint256 maxDebt = Math.max(debtA, debtB);
 
         // decide which token to sell rewards to
         address sellToken = address(want);
+        /*
         if (maxDebt > BASIS_PRECISION) {
-            if (calcDebtRatioA() > calcDebtRatioB()) {
+            if (debtA > debtB) {
                 sellToken = address(shortA);
             } else {
                 sellToken = address(shortB);
             }
         }
+        */
         swapExactFromTo(address(compToken), sellToken, compToken.balanceOf(address(this)));
         swapExactFromTo(address(farmToken), sellToken, farmToken.balanceOf(address(this)));
 
+        /*
         _repayDebtA();
         _repayDebtB();
-        _wantHarvested = balanceOfWant().sub(wantBefore);
+        */
     }
 
     // if debt ratio debtLower for both short A & short B convert some of the trading fees to want to get closer to hedged position
@@ -720,8 +726,8 @@ abstract contract CoreStrategy is BaseStrategy {
             _repayDebtA();
             _repayDebtB();
             _redeemWant(_amountNeeded);
-            _loss = totalDebt.sub(estimatedTotalAssets());
-            _liquidatedAmount = balanceOfWant().sub(balanceWant);
+            _loss = 0;
+            _liquidatedAmount = _amountNeeded;
         }
 
 

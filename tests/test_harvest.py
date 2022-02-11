@@ -1,6 +1,7 @@
 
 import pytest
 from brownie import Contract, interface, accounts
+import time 
 
 
 def test_profitable_harvest(
@@ -18,25 +19,33 @@ def test_profitable_harvest(
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
     before_pps = vault.pricePerShare()
 
-    for i in range(4):
+    harvest = interface.ERC20(conf['harvest_token'])
+    harvestWhale = accounts.at(conf['harvest_token_whale'], True)
+    sendAmount = round((vault.totalAssets() / conf['harvest_token_price']) * 0.0125)
 
+
+    for i in range(2):
+
+        print('Harvest Number :  {0}'.format(i))
         # Use a whale of the harvest token to send
-        harvest = interface.ERC20(conf['harvest_token'])
-        harvestWhale = accounts.at(conf['harvest_token_whale'], True)
-        sendAmount = round((vault.totalAssets() / conf['harvest_token_price']) * 0.0125)
-        print('Send amount: {0}'.format(sendAmount))
-        print('harvestWhale balance: {0}'.format(harvest.balanceOf(harvestWhale)))
+        #print('Send amount: {0}'.format(sendAmount))
+        #print('harvestWhale balance: {0}'.format(harvest.balanceOf(harvestWhale)))
         harvest.transfer(strategy, sendAmount, {'from': harvestWhale})
 
+
         # Harvest 2: Realize profit
-        chain.sleep(1)
-        tx = strategy.harvest()
+        chain.sleep(35)
+        chain.mine(35)
+        #give the RPC a breather pre harvest as spazzes out sometimes 
+        time.sleep(5)
+        strategy.harvest()
         chain.sleep(3600 * 6)  # 6 hrs needed for profits to unlock
         chain.mine(1)
         profit = token.balanceOf(vault.address)  # Profits go to vault
 
         print('Price per Share :  {0}'.format(vault.pricePerShare()))
         print('Estimated Assets :  {0}'.format(strategy.estimatedTotalAssets()))
+
     assert strategy.estimatedTotalAssets() + profit > amount
     assert vault.pricePerShare() > before_pps
 
@@ -67,7 +76,7 @@ def test_profitable_harvest_trading_fees(
     sendAmtA = shortA.balanceOf(lp_token)*0.025
     sendAmtB = shortB.balanceOf(lp_token)*0.025
 
-    for i in range(4):
+    for i in range(2):
 
         shortA.transfer(lp_token, sendAmtA, {'from': tradingFeeWhale})
         shortB.transfer(lp_token, sendAmtB, {'from': tradingFeeWhale})

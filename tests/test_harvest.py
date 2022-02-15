@@ -34,11 +34,11 @@ def test_profitable_harvest(
 
 
         # Harvest 2: Realize profit
-        chain.sleep(35)
-        chain.mine(35)
+        chain.sleep(5)
+        chain.mine(5)
         #give the RPC a breather pre harvest as spazzes out sometimes 
-        time.sleep(5)
-        strategy.harvest()
+        #time.sleep(5)
+        strategy.harvest({'from': gov})
         chain.sleep(3600 * 6)  # 6 hrs needed for profits to unlock
         chain.mine(1)
         profit = token.balanceOf(vault.address)  # Profits go to vault
@@ -103,7 +103,7 @@ def test_profitable_harvest_trading_fees(
         print('Estimated Assets :  {0}'.format(strategy.estimatedTotalAssets()))
 
         print("Sell Trading Fees & Complete Harvest")
-        strategy.sellTradingFees()
+        #strategy.sellTradingFees()
         strategy.harvest()
         
         chain.sleep(3600 * 6)  # 6 hrs needed for profits to unlock

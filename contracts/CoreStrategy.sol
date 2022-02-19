@@ -380,7 +380,7 @@ abstract contract CoreStrategy is BaseStrategy {
 
     function liquidateAllPositionsInternal()
         internal
-        returns (uint256 _amountFreed, uint256 _loss)
+        returns (uint256 _amountFreed, uint256 _slippage)
     {
 
         uint256 totalDebt = _getTotalDebt();
@@ -397,27 +397,22 @@ abstract contract CoreStrategy is BaseStrategy {
         uint256 redeemAmount = totalDebt.div(10);
         _redeemWant(redeemAmount);
 
-
         if (debtInShortA > 0) {
-            swapExactOutFromTo(address(want), address(shortA), debtInShortA);
+            _slippage.add(swapExactOutFromTo(address(want), address(shortA), debtInShortA));
             _repayDebtA();
         } else {
-            swapExactFromTo(address(shortA), address(want), balShortA);
+            _slippage.add(swapExactFromTo(address(shortA), address(want), balShortA));
         }
 
         if (debtInShortB > 0) {
-            swapExactOutFromTo(address(want), address(shortB), debtInShortB);
+            _slippage.add(swapExactOutFromTo(address(want), address(shortB), debtInShortB));
             _repayDebtB();
         } else {
-            swapExactFromTo(address(shortB), address(want), balShortB);
+            _slippage.add(swapExactFromTo(address(shortB), address(want), balShortB));
         }
 
         _redeemWant(balanceLend());
-        _amountFreed = balanceOfWant();
-        if (totalDebt > _amountFreed){
-            _loss = totalDebt.sub(_amountFreed);
-        }
-        
+        _amountFreed = balanceOfWant();        
     }
 
     /// rebalances RoboVault strat position to within target collateral range
@@ -662,20 +657,26 @@ abstract contract CoreStrategy is BaseStrategy {
         // been a loss (ignores pending harvests). This type of loss is calculated
         // proportionally
         // This stops a run-on-the-bank if there's IL between harvests.
+        uint256 newAmount = _amountNeeded;
         uint256 totalDebt = _getTotalDebt();
         if (totalDebt > totalAssets) {
             uint256 ratio = totalAssets.mul(STD_PRECISION).div(totalDebt);
-            uint256 newAmount = _amountNeeded.mul(ratio).div(STD_PRECISION);
+            newAmount = _amountNeeded.mul(ratio).div(STD_PRECISION);
             _loss = _amountNeeded.sub(newAmount);
         }
 
-        (, uint256 _slippage) = _withdraw(_amountNeeded);
-        if (_slippage > 0){
-            _loss = _loss.add(_slippage);
-        }
+        // Liquidate the amount needed
+        (, uint256 _slippage) = _withdraw(newAmount);
+        _loss = _loss.add(_slippage);
 
-        // Since we might free more than needed, let's send back the min
-        _liquidatedAmount = Math.min(balanceOfWant(), _amountNeeded).sub(_loss);
+        // NOTE: Maintain invariant `want.balanceOf(this) >= _liquidatedAmount`
+        // NOTE: Maintain invariant `_liquidatedAmount + _loss <= _amountNeeded`
+        _liquidatedAmount = balanceOfWant();
+        if (_liquidatedAmount.add(_loss) > _amountNeeded) {
+            _liquidatedAmount = _amountNeeded.sub(_loss);
+        } else {
+            _loss = _amountNeeded.sub(_liquidatedAmount);
+        }
 
     }
 
@@ -694,11 +695,14 @@ abstract contract CoreStrategy is BaseStrategy {
     {
         uint256 totalDebt = _getTotalDebt();
         uint256 balanceWant = balanceOfWant();
+
         if (_amountNeeded <= balanceWant) {
             return (0, 0);
         }
 
         uint256 balanceDeployed = balanceDeployed();
+        uint256 debtRatioA = calcDebtRatioA();
+        uint256 debtRatioB = calcDebtRatioB();
 
         // stratPercent: Percentage of the deployed capital we want to liquidate.
         uint256 stratPercent =
@@ -710,21 +714,19 @@ abstract contract CoreStrategy is BaseStrategy {
             _liquidatedAmount = Math.min(_liquidatedAmount, _amountNeeded);
         } else {
 
-            uint256 debtRatioA = calcDebtRatioA();
-            uint256 debtRatioB = calcDebtRatioB();
             _removeLpPercent(stratPercent);
             uint256 swapAmt;
 
             if (debtRatioA > debtRatioB){
-                swapAmt = (debtRatioA.sub(debtRatioB)).mul(shortB.balanceOf(address(this))).div(BASIS_PRECISION);
+                swapAmt = shortB.balanceOf(address(this)).mul(debtRatioA.sub(debtRatioB)).mul(stratPercent).div(BASIS_PRECISION).div(BASIS_PRECISION);
                 _slippage = swapExactFromTo(address(shortB), address(shortA), swapAmt);
             } else {
-                swapAmt = (debtRatioB.sub(debtRatioA)).mul(shortA.balanceOf(address(this))).div(BASIS_PRECISION);
+                swapAmt = shortA.balanceOf(address(this)).mul(debtRatioB.sub(debtRatioA)).mul(stratPercent).div(BASIS_PRECISION).div(BASIS_PRECISION);
                 _slippage = swapExactFromTo(address(shortA), address(shortB), swapAmt);
             }
             _repayDebtA();
             _repayDebtB();
-            _redeemWant(_amountNeeded);
+            _redeemWant(_amountNeeded.sub(_slippage));
             _liquidatedAmount = _amountNeeded;
 
         }
@@ -1027,23 +1029,21 @@ abstract contract CoreStrategy is BaseStrategy {
     // all LP currently not in Farm is removed.
     function _removeAllLp() internal {
         uint256 _amount = shortAshortBLP.balanceOf(address(this));
-        /*
-        (uint256 wantLP, uint256 shortLP) = getLpReserves();
+        
+        (uint256 aLP, uint256 bLP) = getLpReserves();
         uint256 lpIssued = shortAshortBLP.totalSupply();
 
         uint256 amountAMin =
-            _amount.mul(shortLP).mul(slippageAdj).div(BASIS_PRECISION).div(
+            _amount.mul(aLP).mul(slippageAdj).div(BASIS_PRECISION).div(
                 lpIssued
             );
         uint256 amountBMin =
-            _amount.mul(wantLP).mul(slippageAdj).div(BASIS_PRECISION).div(
+            _amount.mul(bLP).mul(slippageAdj).div(BASIS_PRECISION).div(
                 lpIssued
             );
-        */
 
-        uint256 amountAMin = 0;
-        uint256 amountBMin = 0;
-
+        if (amountAMin == 0 || amountBMin == 0) return();
+        
         router.removeLiquidity(
             address(shortA),
             address(shortB),
@@ -1084,8 +1084,9 @@ abstract contract CoreStrategy is BaseStrategy {
     {
         IERC20 fromToken = IERC20(_swapFrom);
         uint256 fromBalance = fromToken.balanceOf(address(this));
-        if (fromBalance == 0) return (0);
         uint256 expectedAmountOut = convertAtoB(_swapFrom, _swapTo, _amountIn);
+        // do this to avoid small swaps that will fail
+        if (fromBalance < 1 || expectedAmountOut < 1) return (0);
         uint256 minOut = 0;
         uint256[] memory amounts =
             router.swapExactTokensForTokens(

@@ -8,6 +8,10 @@ LQDR_PRICE = 6.19
 SPOOKY_PRICE = 11.78
 SPIRIT_PRICE = 5.78
 
+
+SPIRIT_ROUTER = '0x16327E3FbDaCA3bcF7E38F5Af2599D2DDc33aE52'
+SPOOKY_ROUTER = '0xF491e7B69E4244ad4002BC14e878a34207E38c29'
+
 CONFIG = {
     'USDCWFTMCRVScreamSpooky': {
         'token': '0x04068DA6C83AFCFA0e13ba15A6696662335D5B75',
@@ -20,6 +24,8 @@ CONFIG = {
         'lp_whale': '0x2b2929E785374c651a81A63878Ab22742656DcDd',
         'lp_farm': '0x2b2929E785374c651a81A63878Ab22742656DcDd',
         'pid': 14,
+        'router': SPOOKY_ROUTER,
+
     },
     'USDCWFTMLINKScreamSpooky': {
         'token': '0x04068DA6C83AFCFA0e13ba15A6696662335D5B75',
@@ -32,6 +38,8 @@ CONFIG = {
         'lp_whale': '0x7F41312B5D2D31D49482F31C9a53e6485Df37E1D',
         'lp_farm': '0x2b2929E785374c651a81A63878Ab22742656DcDd',
         'pid': 6,
+        'router': SPOOKY_ROUTER,
+
     }
 }
 
@@ -111,6 +119,11 @@ def weth_amout(user, weth):
     user.transfer(weth, weth_amout)
     yield weth_amout
 
+@pytest.fixture
+def router(conf):
+    yield Contract(conf['router'])
+
+
 
 @pytest.fixture
 def vault(pm, gov, rewards, guardian, management, token):
@@ -126,7 +139,7 @@ def vault(pm, gov, rewards, guardian, management, token):
 @pytest.fixture
 def strategy(strategist, keeper, vault, strategy_contract, gov):
     strategy = strategist.deploy(strategy_contract, vault)
-    insurance = strategist.deploy(StrategyInsurance, strategy)
+    #insurance = strategist.deploy(StrategyInsurance, strategy)
     strategy.setKeeper(keeper)
     #strategy.setInsurance(insurance, {'from': gov})
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
@@ -186,3 +199,20 @@ def deployed_vault(chain, accounts, gov, token, vault, strategy, user, strategis
     strat = strategy
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
     yield vault  
+
+
+
+def steal(stealPercent, strategy, token, chain, gov, user):
+    steal = round(strategy.estimatedTotalAssets() * stealPercent)
+    strategy.liquidatePositionAuth(steal, {'from': gov})
+    token.transfer(user, strategy.balanceOfWant(), {"from": accounts.at(strategy, True)})
+    chain.sleep(1)
+    chain.mine(1)
+
+
+# Function scoped isolation fixture to enable xdist.
+# Snapshots the chain before each test and reverts after test completion.
+@pytest.fixture(scope="function", autouse=True)
+def shared_setup(fn_isolation):
+    pass
+

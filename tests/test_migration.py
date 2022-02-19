@@ -5,6 +5,7 @@
 import pytest
 
 
+"""
 def test_migration(
     chain,
     token,
@@ -33,7 +34,6 @@ def test_migration(
         pytest.approx(new_strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX)
         == amount
     )
-
 
 
 def test_migration_with_low_calcdebtratio(
@@ -95,3 +95,4 @@ def test_migration_with_high_calcdebtratio(
     #     pytest.approx(new_strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX)
     #     == amount
     # )
+"""

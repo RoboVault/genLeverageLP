@@ -17,7 +17,6 @@ def test_profitable_harvest(
     chain.sleep(1)
     strategy.harvest()
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
-    before_pps = vault.pricePerShare()
 
     harvest = interface.ERC20(conf['harvest_token'])
     harvestWhale = accounts.at(conf['harvest_token_whale'], True)
@@ -25,6 +24,7 @@ def test_profitable_harvest(
 
 
     for i in range(2):
+        before_pps = vault.pricePerShare()
 
         print('Harvest Number :  {0}'.format(i))
         # Use a whale of the harvest token to send
@@ -46,8 +46,8 @@ def test_profitable_harvest(
         print('Price per Share :  {0}'.format(vault.pricePerShare()))
         print('Estimated Assets :  {0}'.format(strategy.estimatedTotalAssets()))
 
-    assert strategy.estimatedTotalAssets() + profit > amount
-    assert vault.pricePerShare() > before_pps
+        assert strategy.estimatedTotalAssets() + profit > amount
+        assert vault.pricePerShare() > before_pps
 
 
 def test_profitable_harvest_trading_fees(
@@ -63,7 +63,6 @@ def test_profitable_harvest_trading_fees(
     chain.sleep(1)
     strategy.harvest()
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
-    before_pps = vault.pricePerShare()
 
     # Use a whale of the shortA & shortB (other LP) token to send & simulate high trading fees being accrued
     print("Simulate accooomulation of trading fees within LP")
@@ -77,6 +76,7 @@ def test_profitable_harvest_trading_fees(
     sendAmtB = shortB.balanceOf(lp_token)*0.025
 
     for i in range(2):
+        before_pps = vault.pricePerShare()
 
         shortA.transfer(lp_token, sendAmtA, {'from': tradingFeeWhale})
         shortB.transfer(lp_token, sendAmtB, {'from': tradingFeeWhale})
@@ -116,8 +116,6 @@ def test_profitable_harvest_trading_fees(
         print('CollatRatio: {0}'.format(strategy.calcCollateral()))
         print('Price per Share :  {0}'.format(vault.pricePerShare()))
         print('Estimated Assets :  {0}'.format(strategy.estimatedTotalAssets()))
-
-
-    assert strategy.estimatedTotalAssets() + profit > amount
-    assert vault.pricePerShare() > before_pps
+        assert strategy.estimatedTotalAssets() + profit > amount
+        assert vault.pricePerShare() > before_pps
 

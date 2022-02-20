@@ -228,6 +228,59 @@ def test_reduce_debt_offsetB(
     strategy.harvest()
     assert strategy.estimatedTotalAssets() < 10 ** (token.decimals() - 3) # near zero
 
+def test_increase_debt_offsetA(
+    chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, router, lp_token , Contract, conf
+):
+    strategy.approveContracts({'from':gov})
+    # Deposit to the vault and harvest
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+
+    half = int(amount / 2)
+
+    vault.updateStrategyDebtRatio(strategy.address, 50_00, {"from": gov})
+    chain.sleep(1)
+    strategy.harvest()
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == half
+
+    swapPct = 0.02
+    offSetDebtRatioA(strategy, lp_token, token, Contract, swapPct, router)
+
+    lossAdj = strategy.estimatedTotalAssets() / half
+
+    vault.updateStrategyDebtRatio(strategy.address, 100_00, {"from": gov})
+    chain.sleep(1)
+    strategy.harvest()
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == half*(1 + lossAdj)
+
+
+def test_increase_debt_offsetB(
+    chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, router, lp_token , Contract, conf
+):
+    strategy.approveContracts({'from':gov})
+    # Deposit to the vault and harvest
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+
+    half = int(amount / 2)
+
+
+    vault.updateStrategyDebtRatio(strategy.address, 50_00, {"from": gov})
+    chain.sleep(1)
+    strategy.harvest()
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == half
+
+    swapPct = 0.02
+    offSetDebtRatioB(strategy, lp_token, token, Contract, swapPct, router)
+
+    lossAdj = strategy.estimatedTotalAssets() / half
+
+    vault.updateStrategyDebtRatio(strategy.address, 100_00, {"from": gov})
+    chain.sleep(1)
+    strategy.harvest()
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == half*(1 + lossAdj)
+
+
 
 def test_partialWithdraw_OffsetA(
     chain, accounts, gov, token, vault, strategy, user, strategist, lp_token, Contract, amount, RELATIVE_APPROX, router, conf
@@ -247,6 +300,7 @@ def test_partialWithdraw_OffsetA(
 
     swapPct = 0.02
     offSetDebtRatioA(strategy, lp_token, token, Contract, swapPct, router)
+
 
     chain.sleep(1)
     chain.mine(1)
@@ -355,4 +409,106 @@ def test_partialWithdraw_OffsetB(
     )
     assert (
         pytest.approx(debtRatioBNew, rel=2e-3) == debtRatioB
+    )
+
+
+def test_fullWithdraw_OffsetA(
+    chain, accounts, gov, token, vault, strategy, user, strategist, lp_token, Contract, amount, RELATIVE_APPROX, router, conf
+):
+    strategy.approveContracts({'from':gov})
+    # Deposit to the vault
+    
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+    assert token.balanceOf(vault.address) == amount
+    
+    # harvest
+    chain.sleep(1)
+    strategy.harvest()
+    strat = strategy
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
+
+    swapPct = 0.02
+    offSetDebtRatioA(strategy, lp_token, token, Contract, swapPct, router)
+
+    chain.sleep(1)
+    chain.mine(1)
+
+    # check debt ratio
+    debtRatioA = strategy.calcDebtRatioA()
+    debtRatioB = strategy.calcDebtRatioB()
+
+    collatRatio = strategy.calcCollateral()
+    print('debtRatioA:   {0}'.format(debtRatioA))
+    print('debtRatioB:   {0}'.format(debtRatioB))
+    print('collatRatio: {0}'.format(collatRatio))
+    #assert pytest.approx(10000, rel=1e-3) == debtRatioA
+    #assert pytest.approx(10000, rel=1e-3) == debtRatioB
+    assert pytest.approx(strategy.collatTarget(), rel=1e-2) == collatRatio
+
+    withdrawPct = 1
+    withdrawAmt = int(amount*withdrawPct)
+
+    # check impact of offseting debt ratios on assets 
+    lossAdj = strategy.estimatedTotalAssets() / amount 
+
+    user_balance_before = token.balanceOf(user)
+
+    vault.withdraw(withdrawAmt, user, 500, {'from' : user}) 
+
+    assert (
+        pytest.approx(token.balanceOf(user), rel=1e-2) == user_balance_before + withdrawPct*lossAdj*amount
+    )
+
+    assert( 
+        pytest.approx(strategy.estimatedTotalAssets(), rel = 2e-3) == amount*(1-withdrawPct)*lossAdj
+    )
+
+
+def test_fullWithdraw_OffsetB(
+    chain, accounts, gov, token, vault, strategy, user, strategist, lp_token, Contract, amount, RELATIVE_APPROX, router, conf
+):
+    strategy.approveContracts({'from':gov})
+    # Deposit to the vault
+    
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+    assert token.balanceOf(vault.address) == amount
+    
+    # harvest
+    chain.sleep(1)
+    strategy.harvest()
+    strat = strategy
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
+
+    swapPct = 0.02
+    offSetDebtRatioB(strategy, lp_token, token, Contract, swapPct, router)
+
+    chain.sleep(1)
+    chain.mine(1)
+
+    # check debt ratio
+    debtRatioA = strategy.calcDebtRatioA()
+    debtRatioB = strategy.calcDebtRatioB()
+
+    collatRatio = strategy.calcCollateral()
+    print('debtRatioA:   {0}'.format(debtRatioA))
+    print('debtRatioB:   {0}'.format(debtRatioB))
+    print('collatRatio: {0}'.format(collatRatio))
+
+    assert pytest.approx(strategy.collatTarget(), rel=1e-2) == collatRatio
+
+    withdrawPct = 1
+    withdrawAmt = int(amount*withdrawPct)
+
+    # check impact of offseting debt ratios on assets 
+    lossAdj = strategy.estimatedTotalAssets() / amount 
+    user_balance_before = token.balanceOf(user)
+    vault.withdraw(withdrawAmt, user, 500, {'from' : user}) 
+
+    assert (
+        pytest.approx(token.balanceOf(user), rel=1e-2) == user_balance_before + withdrawPct*lossAdj*amount
+    )
+    assert( 
+        pytest.approx(strategy.estimatedTotalAssets(), rel = 2e-3) == amount*(1-withdrawPct)*lossAdj
     )

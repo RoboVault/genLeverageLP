@@ -96,8 +96,7 @@ abstract contract CoreStrategy is BaseStrategy {
     uint256 public debtLower = 9900;
     uint256 public rebalancePercent = 10000; // 100% (how far does rebalance of debt move towards 100% from threshold)
 
-    // protocal limits & upper, target and lower thresholds for ratio of debt to collateral
-    uint256 public collatLimit = 7500;
+    bool public doPriceCheck = true; 
 
     // ERC20 Tokens;
     IERC20 public shortA;
@@ -122,6 +121,7 @@ abstract contract CoreStrategy is BaseStrategy {
     IPriceOracle oracleB;
 
     uint256 public slippageAdj = 9000; // 90%
+    uint256 public priceSourceDiff = 500; // 5% Default
     /// HACK for harvest logic
     uint256 public pendingFarmRewards = 10000;
 
@@ -182,6 +182,20 @@ abstract contract CoreStrategy is BaseStrategy {
 
     function name() external view override returns (string memory) {
         return "StrategyHedgedFarming";
+    }
+
+    function _testPriceSource() internal view returns (bool) {
+        if (doPriceCheck){
+            uint256 shortARatio = oracleA.getPrice() / convertAtoB(address(shortA), address(want), 1e18);
+            uint256 shortBRatio = oracleB.getPrice() / convertAtoB(address(shortB), address(want), 1e18);
+            bool shortAWithinRange = (shortARatio > BASIS_PRECISION.sub(priceSourceDiff) &&
+                    shortARatio < BASIS_PRECISION.add(priceSourceDiff));
+            bool shortBWithinRange = (shortBRatio > BASIS_PRECISION.sub(priceSourceDiff) &&
+                    shortBRatio < BASIS_PRECISION.add(priceSourceDiff));
+
+            return (shortAWithinRange && shortBWithinRange);
+        }
+        return true;
     }
 
     function prepareReturn(uint256 _debtOutstanding)
@@ -295,31 +309,15 @@ abstract contract CoreStrategy is BaseStrategy {
         IERC20(address(shortAshortBLP)).safeApprove(address(farm), uint256(-1));
     }
 
-    function resetApprovals() external virtual onlyGovernance {
-        want.safeApprove(address(cTokenLend), uint256(0));
-        shortA.safeApprove(address(cTokenBorrowA), uint256(0));
-        shortB.safeApprove(address(cTokenBorrowB), uint256(0));
-
-        //want.safeApprove(address(router), uint256(-1));
-        want.safeApprove(address(router), uint256(0));
-        shortA.safeApprove(address(router), uint256(0));
-        shortB.safeApprove(address(router), uint256(0));
-
-        farmToken.safeApprove(address(router), uint256(0));
-        compToken.safeApprove(address(router), uint256(0));
-        IERC20(address(shortAshortBLP)).safeApprove(
-            address(router),
-            uint256(0)
-        );
-        IERC20(address(shortAshortBLP)).safeApprove(address(farm), uint256(0));
-    }
-
-    function setSlippageAdj(uint256 _slippageAdj)
+    function setSlippageConfig(uint256 _slippageAdj, uint256 _priceSourceDif, bool _doPriceCheck)
         external
         onlyAuthorized
     {
         slippageAdj = _slippageAdj;
+        priceSourceDiff = _priceSourceDif;
+        doPriceCheck = _doPriceCheck;
     }
+
 
     /*
     function migrateInsurance(address _newInsurance) external onlyGovernance {
@@ -345,12 +343,9 @@ abstract contract CoreStrategy is BaseStrategy {
     function setCollateralThresholds(
         uint256 _lower,
         uint256 _target,
-        uint256 _upper,
-        uint256 _limit
+        uint256 _upper
     ) external onlyAuthorized {
-        require(_limit <= BASIS_PRECISION);
-        collatLimit = _limit;
-        require(collatLimit > _upper);
+        require(_upper <= BASIS_PRECISION);
         require(_upper >= _target);
         require(_target >= _lower);
         collatUpper = _upper;

@@ -1,15 +1,12 @@
-# TODO: Add tests that show proper operation of this strategy through "emergencyExit"
-#       Make sure to demonstrate the "worst case losses" as well as the time it takes
-
 from brownie import ZERO_ADDRESS
 import pytest
-
 
 def test_vault_shutdown_can_withdraw(
     chain, token, vault, strategy, user, amount, gov, RELATIVE_APPROX
 ):
-    strategy.approveContracts({'from': gov})
     ## Deposit in Vault
+    strategy.approveContracts({'from':gov})
+
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
     assert token.balanceOf(vault.address) == amount
@@ -18,6 +15,7 @@ def test_vault_shutdown_can_withdraw(
         token.transfer(ZERO_ADDRESS, token.balanceOf(user), {"from": user})
 
     # Harvest 1: Send funds through the strategy
+    chain.sleep(1)
     strategy.harvest()
     chain.sleep(3600 * 7)
     chain.mine(1)
@@ -35,13 +33,15 @@ def test_vault_shutdown_can_withdraw(
 def test_basic_shutdown(
     chain, token, vault, strategy, user, strategist, gov, amount, RELATIVE_APPROX
 ):
-    strategy.approveContracts({'from': gov})
     # Deposit to the vault
+    strategy.approveContracts({'from':gov})
+
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
     assert token.balanceOf(vault.address) == amount
 
     # Harvest 1: Send funds through the strategy
+    chain.sleep(1)
     strategy.harvest()
     chain.mine(100)
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
@@ -55,11 +55,11 @@ def test_basic_shutdown(
     chain.sleep(3600 * 6)  # 6 hrs needed for profits to unlock
     chain.mine(1)
 
-    ## Set emergency
+    ## Set emergency
     strategy.setEmergencyExit({"from": strategist})
 
     strategy.harvest()  ## Remove funds from strategy
 
-    assert token.balanceOf(strategy) == 0
+    dust = amount*0.00001
+    assert strategy.estimatedTotalAssets() < dust ## the strat shouldn't have more than some dust 
     assert token.balanceOf(vault) >= amount  ## The vault has all funds
-    ## NOTE: May want to tweak this based on potential loss during migration

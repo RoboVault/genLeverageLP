@@ -1,7 +1,9 @@
 import brownie
 from brownie import Contract, interface, accounts
 import pytest
+import time 
 
+# PUT ALL TESTS HERE WHERE WE OFFSET THE LP PRICE 
 
 #this gets LP on other AMM so we can SIM a swap to offset debt Ratios 
 def getWhaleAddress(strategy, routerAddress, Contract) : 
@@ -52,7 +54,7 @@ def test_debt_rebalance_low(chain, accounts, token, deployed_vault, strategy, us
     # Change the debt ratio to ~95% and rebalance
 
     # USE SPIRIT LP 
-    swapPct = 0.04
+    swapPct = 0.025
 
     offSetDebtRatioA(strategy, lp_token, token, Contract, swapPct, router)
 
@@ -76,7 +78,7 @@ def test_debt_rebalance_high(chain, accounts, token, deployed_vault, strategy, u
     # Change the debt ratio to ~95% and rebalance
 
     # USE SPIRIT LP 
-    swapPct = 0.04
+    swapPct = 0.025
 
     offSetDebtRatioB(strategy, lp_token, token, Contract, swapPct, router)
 
@@ -512,3 +514,112 @@ def test_fullWithdraw_OffsetB(
     assert( 
         pytest.approx(strategy.estimatedTotalAssets(), rel = 2e-3) == amount*(1-withdrawPct)*lossAdj
     )
+
+
+def test_Sandwhich_A(
+    chain, gov, accounts, token, vault, strategy, user, strategist, lp_token ,amount, RELATIVE_APPROX, conf, router
+
+):
+    strategy.approveContracts({'from':gov})
+    # Deposit to the vault and harvest
+
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+
+    balBefore = token.balanceOf(user)
+
+    vault.updateStrategyDebtRatio(strategy.address, 100_00, {"from": gov})
+    chain.sleep(1)
+    strategy.harvest()
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
+
+    # do a big swap to offset debt ratio's massively 
+    swapPct = 0.7
+    offSetDebtRatioA(strategy, lp_token, token, Contract, swapPct, router)
+
+    offsetEstimatedAssets  = strategy.estimatedTotalAssets()
+    strategyLoss = amount - strategy.estimatedTotalAssets()
+    lossPercent = strategyLoss / amount
+
+    # check debt ratio
+    debtRatioA = strategy.calcDebtRatioA()
+    debtRatioB = strategy.calcDebtRatioB()
+
+    collatRatio = strategy.calcCollateral()
+    print('debtRatioA:   {0}'.format(debtRatioA))
+    print('debtRatioB:   {0}'.format(debtRatioB))
+    print('collatRatio: {0}'.format(collatRatio))
+
+    print("Try to rebalance - this should fail due to _testPriceSource()")
+    with brownie.reverts():
+        strategy.rebalanceDebt()
+
+    assert debtRatioA == strategy.calcDebtRatioA()
+    assert debtRatioB == strategy.calcDebtRatioB()
+
+    chain.sleep(1)
+    chain.mine(1)
+    balBefore = token.balanceOf(user)
+
+    #give RPC a little break to stop it spzzing out 
+    time.sleep(5)
+    percentWithdrawn = 0.7
+
+    withdrawAmt = int(amount * percentWithdrawn)
+
+    with brownie.reverts():     
+        vault.withdraw({'from' : user}) 
+
+def test_Sandwhich_B(
+    chain, gov, accounts, token, vault, strategy, user, strategist, lp_token ,amount, RELATIVE_APPROX, conf, router
+):
+    strategy.approveContracts({'from':gov})
+    # Deposit to the vault and harvest
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+
+    balBefore = token.balanceOf(user)
+
+    vault.updateStrategyDebtRatio(strategy.address, 100_00, {"from": gov})
+    chain.sleep(1)
+    strategy.harvest()
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
+
+    # do a big swap to offset debt ratio's massively 
+    swapPct = 0.7
+    offSetDebtRatioB(strategy, lp_token, token, Contract, swapPct, router)
+
+    print("Try to rebalance - this should fail due to _testPriceSource()")
+    # for some reason brownie.reverts doesn't fail.... here although transaction reverts... 
+    with brownie.reverts():     
+        strategy.rebalanceDebt()
+
+    # check debt ratio
+    debtRatioA = strategy.calcDebtRatioA()
+    debtRatioB = strategy.calcDebtRatioB()
+
+    collatRatio = strategy.calcCollateral()
+    print('debtRatioA:   {0}'.format(debtRatioA))
+    print('debtRatioB:   {0}'.format(debtRatioB))
+    print('collatRatio: {0}'.format(collatRatio))
+
+    assert debtRatioA == strategy.calcDebtRatioA()
+    assert debtRatioB == strategy.calcDebtRatioB()
+
+
+    offsetEstimatedAssets  = strategy.estimatedTotalAssets()
+    strategyLoss = amount - strategy.estimatedTotalAssets()
+    lossPercent = strategyLoss / amount
+
+    chain.sleep(1)
+    chain.mine(1)
+    balBefore = token.balanceOf(user)
+
+    #give RPC a little break to stop it spzzing out 
+    time.sleep(5)
+    percentWithdrawn = 0.7
+
+    withdrawAmt = int(amount * percentWithdrawn)
+
+    with brownie.reverts():     
+        vault.withdraw({'from' : user}) 

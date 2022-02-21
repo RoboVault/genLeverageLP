@@ -120,8 +120,8 @@ abstract contract CoreStrategy is BaseStrategy {
     IPriceOracle oracleA;
     IPriceOracle oracleB;
 
-    uint256 public slippageAdj = 9000; // 90%
-    uint256 public priceSourceDiff = 500; // 5% Default
+    uint256 public slippageAdj = 9800; // 90%
+    uint256 public priceSourceDiff = 1000; // 10% Default
     /// HACK for harvest logic
     uint256 public pendingFarmRewards = 10000;
 
@@ -186,8 +186,8 @@ abstract contract CoreStrategy is BaseStrategy {
 
     function _testPriceSource() internal view returns (bool) {
         if (doPriceCheck){
-            uint256 shortARatio = oracleA.getPrice() / convertAtoB(address(shortA), address(want), 1e18);
-            uint256 shortBRatio = oracleB.getPrice() / convertAtoB(address(shortB), address(want), 1e18);
+            uint256 shortARatio = oracleA.getPrice().mul(BASIS_PRECISION).div(convertAtoB(address(shortA), address(want), 1e18));
+            uint256 shortBRatio = oracleB.getPrice().mul(BASIS_PRECISION).div(convertAtoB(address(shortB), address(want), 1e18));
             bool shortAWithinRange = (shortARatio > BASIS_PRECISION.sub(priceSourceDiff) &&
                     shortARatio < BASIS_PRECISION.add(priceSourceDiff));
             bool shortBWithinRange = (shortBRatio > BASIS_PRECISION.sub(priceSourceDiff) &&
@@ -421,6 +421,7 @@ abstract contract CoreStrategy is BaseStrategy {
 
     /// rebalances RoboVault holding of short token vs LP to within target collateral range
     function rebalanceDebt() external onlyKeepers {
+        require(_testPriceSource());
         require(calcDebtRatioA() > debtUpper || calcDebtRatioB() > debtUpper);
         _rebalanceDebtInternal();
     }
@@ -540,6 +541,7 @@ abstract contract CoreStrategy is BaseStrategy {
             return;
         }
         */
+        require(_testPriceSource());
         uint256 borrowAmtA =
             _amount
                 .mul(collatTarget)
@@ -688,6 +690,7 @@ abstract contract CoreStrategy is BaseStrategy {
         internal
         returns (uint256 _liquidatedAmount, uint256 _slippage)
     {
+        require(_testPriceSource());
         uint256 totalDebt = _getTotalDebt();
         uint256 balanceWant = balanceOfWant();
 
@@ -1138,14 +1141,15 @@ abstract contract CoreStrategy is BaseStrategy {
         returns (address[] memory)
     {
         // TODO - Fit this into the contract somehow
-        address[] memory protected = new address[](6);
+        address[] memory protected = new address[](0);
+        /*
         protected[0] = address(shortA);
         protected[1] = address(shortAshortBLP);
         protected[2] = address(farmToken);
         protected[3] = address(compToken);
         protected[4] = address(cTokenLend);
         protected[5] = address(shortB);
-
+        */
         return protected;
     }
 }

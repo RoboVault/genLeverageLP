@@ -211,6 +211,7 @@ def test_change_debt_lossy(
     strategy.harvest()
     assert strategy.estimatedTotalAssets() < 10 ** (token.decimals() - 3) # near zero
 
+"""
 def test_sweep(gov, vault, strategy, token, user, amount, conf):
     strategy.approveContracts({'from':gov})
     # Strategy want token doesn't work
@@ -235,7 +236,7 @@ def test_sweep(gov, vault, strategy, token, user, amount, conf):
     #     strategy.sweep(strategy.wantShortLP(), {"from": gov})
     with brownie.reverts("!protected"):
         strategy.sweep(conf['harvest_token'], {"from": gov})
-
+"""
 
 def test_triggers(
     chain, gov, vault, strategy, token, amount, user, conf

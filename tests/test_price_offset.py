@@ -99,7 +99,7 @@ def test_debt_rebalance_high(chain, accounts, token, deployed_vault, strategy, u
 def test_operation_OffsetA(
     chain, accounts, gov, token, vault, strategy, user, strategist, lp_token, Contract, amount, RELATIVE_APPROX, router, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts(Contracts({'from':gov})
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -141,7 +141,7 @@ def test_operation_OffsetA(
 def test_operation_OffsetB(
     chain, accounts, gov, token, vault, strategy, user, strategist, lp_token, Contract, amount, RELATIVE_APPROX, router, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts(Contracts({'from':gov})
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -184,7 +184,7 @@ def test_operation_OffsetB(
 def test_reduce_debt_offsetA(
     chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, router, lp_token , Contract, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts(Contracts({'from':gov})
     # Deposit to the vault and harvest
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -210,7 +210,7 @@ def test_reduce_debt_offsetA(
 def test_reduce_debt_offsetB(
     chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, router, lp_token , Contract, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts(Contracts({'from':gov})
     # Deposit to the vault and harvest
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -233,7 +233,7 @@ def test_reduce_debt_offsetB(
 def test_increase_debt_offsetA(
     chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, router, lp_token , Contract, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts(Contracts({'from':gov})
     # Deposit to the vault and harvest
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -259,7 +259,7 @@ def test_increase_debt_offsetA(
 def test_increase_debt_offsetB(
     chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, router, lp_token , Contract, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts(Contracts({'from':gov})
     # Deposit to the vault and harvest
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -287,7 +287,7 @@ def test_increase_debt_offsetB(
 def test_partialWithdraw_OffsetA(
     chain, accounts, gov, token, vault, strategy, user, strategist, lp_token, Contract, amount, RELATIVE_APPROX, router, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts(Contracts({'from':gov})
     # Deposit to the vault
     
     token.approve(vault.address, amount, {"from": user})
@@ -356,7 +356,7 @@ def test_partialWithdraw_OffsetA(
 def test_partialWithdraw_OffsetB(
     chain, accounts, gov, token, vault, strategy, user, strategist, lp_token, Contract, amount, RELATIVE_APPROX, router, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts(Contracts({'from':gov})
     # Deposit to the vault
     
     token.approve(vault.address, amount, {"from": user})
@@ -417,7 +417,7 @@ def test_partialWithdraw_OffsetB(
 def test_fullWithdraw_OffsetA(
     chain, accounts, gov, token, vault, strategy, user, strategist, lp_token, Contract, amount, RELATIVE_APPROX, router, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts(Contracts({'from':gov})
     # Deposit to the vault
     
     token.approve(vault.address, amount, {"from": user})
@@ -470,7 +470,7 @@ def test_fullWithdraw_OffsetA(
 def test_fullWithdraw_OffsetB(
     chain, accounts, gov, token, vault, strategy, user, strategist, lp_token, Contract, amount, RELATIVE_APPROX, router, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts(Contracts({'from':gov})
     # Deposit to the vault
     
     token.approve(vault.address, amount, {"from": user})
@@ -520,7 +520,7 @@ def test_Sandwhich_A(
     chain, gov, accounts, token, vault, strategy, user, strategist, lp_token ,amount, RELATIVE_APPROX, conf, router
 
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts(Contracts({'from':gov})
     # Deposit to the vault and harvest
 
     token.approve(vault.address, amount, {"from": user})
@@ -573,7 +573,7 @@ def test_Sandwhich_A(
 def test_Sandwhich_B(
     chain, gov, accounts, token, vault, strategy, user, strategist, lp_token ,amount, RELATIVE_APPROX, conf, router
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts(Contracts({'from':gov})
     # Deposit to the vault and harvest
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -623,3 +623,106 @@ def test_Sandwhich_B(
 
     with brownie.reverts():     
         vault.withdraw({'from' : user}) 
+
+def test_migration_offsetA(
+    chain,
+    token,
+    vault,
+    strategy,
+    lp_token,
+    router,
+    amount,
+    strategy_contract,
+    strategist,
+    gov,
+    user,
+    RELATIVE_APPROX,
+):
+    # Deposit to the vault and harvest
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+    chain.sleep(1)
+    #strategy.approveContracts({'from':gov})
+    strategy.harvest()
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
+
+    swapPct = 0.015
+    offSetDebtRatioA(strategy, lp_token, token, Contract, swapPct, router)
+
+    chain.sleep(1)
+    chain.mine(1)
+
+    # check debt ratio
+    debtRatioA = strategy.calcDebtRatioA()
+    debtRatioB = strategy.calcDebtRatioB()
+
+    collatRatio = strategy.calcCollateral()
+    print('debtRatioA:   {0}'.format(debtRatioA))
+    print('debtRatioB:   {0}'.format(debtRatioB))
+    print('collatRatio: {0}'.format(collatRatio))
+
+
+    newAmount = strategy.estimatedTotalAssets()
+
+    # migrate to a new strategy
+    new_strategy = strategist.deploy(strategy_contract, vault)
+    chain.mine(1)
+    chain.sleep(1)
+    #new_strategy.approveContracts({'from':gov})
+    vault.migrateStrategy(strategy, new_strategy, {"from": gov})
+    assert (
+        pytest.approx(new_strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX)
+        == newAmount
+    )
+
+
+
+def test_migration_offsetB(
+    chain,
+    token,
+    vault,
+    strategy,
+    lp_token,
+    router,
+    amount,
+    strategy_contract,
+    strategist,
+    gov,
+    user,
+    RELATIVE_APPROX,
+):
+    # Deposit to the vault and harvest
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+    chain.sleep(1)
+    #strategy.approveContracts({'from':gov})
+    strategy.harvest()
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
+
+    swapPct = 0.015
+    offSetDebtRatioB(strategy, lp_token, token, Contract, swapPct, router)
+
+    chain.sleep(1)
+    chain.mine(1)
+
+    # check debt ratio
+    debtRatioA = strategy.calcDebtRatioA()
+    debtRatioB = strategy.calcDebtRatioB()
+
+    collatRatio = strategy.calcCollateral()
+    print('debtRatioA:   {0}'.format(debtRatioA))
+    print('debtRatioB:   {0}'.format(debtRatioB))
+    print('collatRatio: {0}'.format(collatRatio))
+
+    newAmount = strategy.estimatedTotalAssets()
+
+    # migrate to a new strategy
+    new_strategy = strategist.deploy(strategy_contract, vault)
+    chain.mine(1)
+    chain.sleep(1)
+    #new_strategy.approveContracts({'from':gov})
+    vault.migrateStrategy(strategy, new_strategy, {"from": gov})
+    assert (
+        pytest.approx(new_strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX)
+        == newAmount
+    )

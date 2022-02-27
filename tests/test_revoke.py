@@ -8,7 +8,7 @@ def test_revoke_strategy_from_vault(
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
     chain.sleep(1)
-    strategy.approveContracts({'from':gov})
+    ###strategy.approveContracts({'from':gov})
     strategy.harvest()
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
 
@@ -25,7 +25,7 @@ def test_revoke_strategy_from_strategy(
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
     chain.sleep(1)
-    strategy.approveContracts({'from':gov})
+    ###strategy.approveContracts({'from':gov})
     strategy.harvest()
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
 

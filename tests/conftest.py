@@ -194,7 +194,7 @@ def deployed_vault(chain, accounts, gov, token, vault, strategy, user, strategis
     
     # harvest
     chain.sleep(1)
-    strategy.approveContracts({'from':gov})
+    ##strategy.approveContracts({'from':gov})
     strategy.harvest()
     strat = strategy
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount

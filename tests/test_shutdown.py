@@ -5,7 +5,7 @@ def test_vault_shutdown_can_withdraw(
     chain, token, vault, strategy, user, amount, gov, RELATIVE_APPROX
 ):
     ## Deposit in Vault
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts({'from':gov})
 
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -34,7 +34,7 @@ def test_basic_shutdown(
     chain, token, vault, strategy, user, strategist, gov, amount, RELATIVE_APPROX
 ):
     # Deposit to the vault
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts({'from':gov})
 
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})

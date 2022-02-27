@@ -5,7 +5,7 @@
 import pytest
 
 
-"""
+
 def test_migration(
     chain,
     token,
@@ -22,20 +22,22 @@ def test_migration(
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
     chain.sleep(1)
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts({'from':gov})
     strategy.harvest()
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
 
     # migrate to a new strategy
     new_strategy = strategist.deploy(strategy_contract, vault)
-    new_strategy.approveContracts({'from':gov})
+    chain.mine(1)
+    chain.sleep(1)
+    #new_strategy.approveContracts({'from':gov})
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
     assert (
         pytest.approx(new_strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX)
         == amount
     )
 
-
+"""
 def test_migration_with_low_calcdebtratio(
     chain,
     token,

@@ -7,7 +7,7 @@ import time
 def test_profitable_harvest(
     chain, accounts, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts({'from':gov})
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -53,7 +53,7 @@ def test_profitable_harvest(
 def test_profitable_harvest_trading_fees(
     chain, accounts, gov, token, vault, strategy, user, strategist, lp_token ,amount, RELATIVE_APPROX, Contract, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts({'from':gov})
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})

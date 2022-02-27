@@ -19,7 +19,7 @@ def strategySharePrice(strategy, vault):
 def test_operation_nomral(
     chain, accounts, gov, token, vault, strategy, user, strategist, lp_token, Contract, amount, RELATIVE_APPROX, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts({'from':gov})
     # Deposit to the vault
     user_balance_before = token.balanceOf(user)
     token.approve(vault.address, amount, {"from": user})
@@ -56,7 +56,7 @@ def test_operation_nomral(
 def test_operation_lossy(
     chain, accounts, gov, token, vault, strategy, user, strategist, lp_token, Contract, amount, RELATIVE_APPROX, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts({'from':gov})
     # Deposit to the vault
     user_balance_before = token.balanceOf(user)
     token.approve(vault.address, amount, {"from": user})
@@ -94,7 +94,7 @@ def test_operation_lossy(
 def test_operation_case_A(
     chain, accounts, gov, token, vault, strategy, user, strategist, lp_token, Contract, amount, RELATIVE_APPROX, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts({'from':gov})
     # Deposit to the vault
     user_balance_before = token.balanceOf(user)
     token.approve(vault.address, amount, {"from": user})
@@ -148,7 +148,7 @@ def test_operation_case_A(
 def test_emergency_exit(
     chain, accounts, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts({'from':gov})
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -167,7 +167,7 @@ def test_emergency_exit(
 def test_reduce_debt(
     chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, conf
 ):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts({'from':gov})
     # Deposit to the vault and harvest
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -189,7 +189,7 @@ def test_change_debt_lossy(
     chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, conf
 ):
     # Deposit to the vault and harvest
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts({'from':gov})
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
 
@@ -213,7 +213,7 @@ def test_change_debt_lossy(
 
 """
 def test_sweep(gov, vault, strategy, token, user, amount, conf):
-    strategy.approveContracts({'from':gov})
+    #strategy.approveContracts({'from':gov})
     # Strategy want token doesn't work
     token.transfer(strategy, amount, {"from": user})
     assert token.address == strategy.want()
@@ -241,7 +241,7 @@ def test_sweep(gov, vault, strategy, token, user, amount, conf):
 def test_triggers(
     chain, gov, vault, strategy, token, amount, user, conf
 ):
-    strategy.approveContracts({'from':gov})
+    ##strategy.approveContracts({'from':gov})
     # Deposit to the vault and harvest
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -257,7 +257,7 @@ def test_lossy_withdrawal(
     chain, gov, accounts, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, conf
 ):
     # Deposit to the vault and harvest
-    strategy.approveContracts({'from':gov})
+    ##strategy.approveContracts({'from':gov})
 
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -281,7 +281,7 @@ def test_lossy_withdrawal_partial(
     chain, gov, accounts, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, conf
 ):
     # Deposit to the vault and harvest
-    strategy.approveContracts({'from':gov})
+    ##strategy.approveContracts({'from':gov})
 
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -315,7 +315,7 @@ def test_lossy_withdrawal_tiny(
     chain, gov, accounts, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, conf
 ):
     # Deposit to the vault and harvest
-    strategy.approveContracts({'from':gov})
+    ##strategy.approveContracts({'from':gov})
 
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
@@ -351,7 +351,7 @@ def test_lossy_withdrawal_99pc(
 ):
     # Deposit to the vault and harvest
 
-    strategy.approveContracts({'from':gov})
+    ##strategy.approveContracts({'from':gov})
 
 
     token.approve(vault.address, amount, {"from": user})
@@ -386,7 +386,7 @@ def test_lossy_withdrawal_95pc(
 ):
     # Deposit to the vault and harvest
 
-    strategy.approveContracts({'from':gov})
+    ##strategy.approveContracts({'from':gov})
 
 
     token.approve(vault.address, amount, {"from": user})

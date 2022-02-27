@@ -171,6 +171,7 @@ abstract contract CoreStrategy is BaseStrategy {
         profitFactor = 1500;
         debtThreshold = 1_000_000 * 1e18;
         minDeploy = _config.minDeploy;
+        approveContracts();
     }
 
     // function _updateLendAndDebtAllocation() internal {
@@ -290,7 +291,7 @@ abstract contract CoreStrategy is BaseStrategy {
         }
     }
 
-    function approveContracts() external virtual onlyGovernance {
+    function approveContracts() internal virtual {
         want.safeApprove(address(cTokenLend), uint256(-1));
         shortA.safeApprove(address(cTokenBorrowA), uint256(-1));
         shortB.safeApprove(address(cTokenBorrowB), uint256(-1));
@@ -379,18 +380,18 @@ abstract contract CoreStrategy is BaseStrategy {
     {
 
         uint256 totalDebt = _getTotalDebt();
+        _rebalanceDebtInternal();
         liquidateAllToLend();
-
-        uint256 debtInShortA = balanceDebtInShortA();
-        uint256 debtInShortB = balanceDebtInShortB();
 
         uint256 balShortA = balanceShortA();
         uint256 balShortB = balanceShortB();
 
         // not most efficient solution for slippage but should save on gas 
         // first redeem enough Want to repay debt (if no debt try to swap for Want)
-        uint256 redeemAmount = totalDebt.div(10);
+        uint256 redeemAmount = balanceLend().div(3);
         _redeemWant(redeemAmount);
+
+        uint256 debtInShortA = balanceDebtInShortACurrent();
 
         if (debtInShortA > 0) {
             _slippage.add(swapExactOutFromTo(address(want), address(shortA), debtInShortA));
@@ -399,6 +400,8 @@ abstract contract CoreStrategy is BaseStrategy {
             _slippage.add(swapExactFromTo(address(shortA), address(want), balShortA));
         }
 
+        uint256 debtInShortB = balanceDebtInShortBCurrent();
+
         if (debtInShortB > 0) {
             _slippage.add(swapExactOutFromTo(address(want), address(shortB), debtInShortB));
             _repayDebtB();
@@ -406,7 +409,14 @@ abstract contract CoreStrategy is BaseStrategy {
             _slippage.add(swapExactFromTo(address(shortB), address(want), balShortB));
         }
 
-        _redeemWant(balanceLend());
+        redeemAmount = balanceLend();
+        // check balanceDebt -> due to rounding there may be tiny bit of debt remaining in one of the assets 
+        // if this is the case leave some dust as collateral 
+        if (balanceDebt() > 0) {
+            redeemAmount = balanceLend().sub(balanceDebt().mul(BASIS_PRECISION).div(collatUpper));
+        }
+
+        _redeemWant(redeemAmount);
         _amountFreed = balanceOfWant();        
     }
 
@@ -593,14 +603,15 @@ abstract contract CoreStrategy is BaseStrategy {
         to token with highest debt Ratio 
         */
 
-        if (debtRatioA > debtRatioB) {
+        // note we add some noise to check there is big enough difference between the debt ratios (0.5%) as we also call this during liquidate Position All
+        if (debtRatioA > debtRatioB.add(50)) {
             lpRemovePercent = (debtRatioA.sub(debtRatioB)).div(2);
             _removeLpPercent(lpRemovePercent);
             swapExactFromTo(address(shortB), address(shortA), balanceShortB());
             _repayDebtA();
         }
 
-        if (debtRatioB > debtRatioA) {
+        if (debtRatioB > debtRatioA.add(50)) {
             lpRemovePercent = (debtRatioB.sub(debtRatioA)).div(2);
             _removeLpPercent(lpRemovePercent);
             swapExactFromTo(address(shortA), address(shortB), balanceShortA());
@@ -715,13 +726,17 @@ abstract contract CoreStrategy is BaseStrategy {
             _removeLpPercent(stratPercent);
             uint256 swapAmt;
 
-            if (debtRatioA > debtRatioB){
-                swapAmt = shortB.balanceOf(address(this)).mul(debtRatioA.sub(debtRatioB)).mul(stratPercent).div(BASIS_PRECISION).div(BASIS_PRECISION);
-                _slippage = swapExactFromTo(address(shortB), address(shortA), swapAmt);
-            } else {
-                swapAmt = shortA.balanceOf(address(this)).mul(debtRatioB.sub(debtRatioA)).mul(stratPercent).div(BASIS_PRECISION).div(BASIS_PRECISION);
-                _slippage = swapExactFromTo(address(shortA), address(shortB), swapAmt);
+            // only do a swap if % being withdrawn is > 5% 
+            if (stratPercent > 500) {
+                if (debtRatioA > debtRatioB){
+                    swapAmt = shortB.balanceOf(address(this)).mul(debtRatioA.sub(debtRatioB)).mul(stratPercent).div(BASIS_PRECISION).div(BASIS_PRECISION);
+                    _slippage = swapExactFromTo(address(shortB), address(shortA), swapAmt);
+                } else {
+                    swapAmt = shortA.balanceOf(address(this)).mul(debtRatioB.sub(debtRatioA)).mul(stratPercent).div(BASIS_PRECISION).div(BASIS_PRECISION);
+                    _slippage = swapExactFromTo(address(shortA), address(shortB), swapAmt);
+                }
             }
+
             _repayDebtA();
             _repayDebtB();
             _redeemWant(_amountNeeded.sub(_slippage));
@@ -893,7 +908,6 @@ abstract contract CoreStrategy is BaseStrategy {
         );
     }
 
-    // value of borrowed tokens in value of want tokens
     function balanceDebtInShortA() public view returns (uint256) {
         return cTokenBorrowA.borrowBalanceStored(address(this));
     }
@@ -902,8 +916,6 @@ abstract contract CoreStrategy is BaseStrategy {
         return cTokenBorrowB.borrowBalanceStored(address(this));
     }
 
-    // value of borrowed tokens in value of want tokens
-    // Uses current exchange price, not stored
     function balanceDebtInShortACurrent() public returns (uint256) {
         return cTokenBorrowA.borrowBalanceCurrent(address(this));
     }

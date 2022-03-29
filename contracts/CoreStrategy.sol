@@ -818,6 +818,10 @@ abstract contract CoreStrategy is BaseStrategy {
         );
     }
 
+    function calcDebtRatio() public view returns( uint256, uint256) {
+        return(calcDebtRatioA(), calcDebtRatioB());
+    }
+
     // calculate debt / collateral - used to trigger rebalancing of debt & collateral
     function calcCollateral() public view returns (uint256) {
         return (balanceDebt()).mul(BASIS_PRECISION).div(balanceLend());

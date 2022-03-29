@@ -97,6 +97,7 @@ abstract contract CoreStrategy is BaseStrategy {
     uint256 public rebalancePercent = 10000; // 100% (how far does rebalance of debt move towards 100% from threshold)
 
     bool public doPriceCheck = true; 
+    bool public forceHarvestTriggerOnce;
 
     // ERC20 Tokens;
     IERC20 public shortA;
@@ -197,6 +198,34 @@ abstract contract CoreStrategy is BaseStrategy {
             return (shortAWithinRange && shortBWithinRange);
         }
         return true;
+    }
+
+    ///@notice This allows us to manually harvest with our keeper as needed
+    function setForceHarvestTriggerOnce(bool _forceHarvestTriggerOnce) external onlyAuthorized {
+        forceHarvestTriggerOnce = _forceHarvestTriggerOnce;
+    }
+
+
+    function harvestTrigger(uint256 callCostInWei) public view virtual override returns (bool) {
+        StrategyParams memory params = vault.strategies(address(this));
+
+        // trigger if we want to manually harvest
+        if (forceHarvestTriggerOnce) {
+            return true;
+        }
+
+        uint256 totalAssets = estimatedTotalAssets();
+        uint256 totalDebt = _getTotalDebt();
+        bool isInProfit = totalAssets > totalDebt;
+
+        // harvest no matter what once we reach our maxDelay
+        if (block.timestamp.sub(params.lastReport) > maxReportDelay) {
+            return isInProfit;
+        }
+
+        // if neither of above are met we return false 
+        return false;
+
     }
 
     function prepareReturn(uint256 _debtOutstanding)

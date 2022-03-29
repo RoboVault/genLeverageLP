@@ -200,7 +200,14 @@ def test_change_debt_lossy(
     # Steal from the strategy
     steal = round(strategy.estimatedTotalAssets() * 0.01)
     strategy.liquidatePositionAuth(steal, {'from': gov})
+
+
     token.transfer(user, strategy.balanceOfWant(), {"from": accounts.at(strategy, True)})
+
+    chain.sleep(86410)
+    chain.mine(1)
+    assert strategy.harvestTrigger(1) == False
+
     vault.updateStrategyDebtRatio(strategy.address, 50_00, {"from": gov})
     chain.sleep(1)
     strategy.harvest()

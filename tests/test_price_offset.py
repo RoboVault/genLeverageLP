@@ -726,3 +726,80 @@ def test_migration_offsetB(
         pytest.approx(new_strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX)
         == newAmount
     )
+
+def test_migration_offsetA(
+    chain,
+    token,
+    vault,
+    strategy,
+    amount,
+    strategy_contract,
+    strategist,
+    gov,
+    user,
+    RELATIVE_APPROX,
+    lp_token, 
+    router,
+    Contract
+):
+    # Deposit to the vault and harvest
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+    chain.sleep(1)
+    #strategy.approveContracts({'from':gov})
+    strategy.harvest()
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
+
+    swapPct = 0.025
+    offSetDebtRatioA(strategy, lp_token, token, Contract, swapPct, router)
+
+
+    # migrate to a new strategy
+    new_strategy = strategist.deploy(strategy_contract, vault)
+    chain.mine(1)
+    chain.sleep(1)
+    #new_strategy.approveContracts({'from':gov})
+    vault.migrateStrategy(strategy, new_strategy, {"from": gov})
+    assert (
+        pytest.approx(new_strategy.estimatedTotalAssets(), rel=5e-3)
+        == amount
+    )
+
+
+def test_migration_offsetB(
+    chain,
+    token,
+    vault,
+    strategy,
+    amount,
+    strategy_contract,
+    strategist,
+    gov,
+    user,
+    RELATIVE_APPROX,
+    lp_token, 
+    router,
+    Contract
+):
+    # Deposit to the vault and harvest
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+    chain.sleep(1)
+    #strategy.approveContracts({'from':gov})
+    strategy.harvest()
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
+
+    swapPct = 0.025
+    offSetDebtRatioB(strategy, lp_token, token, Contract, swapPct, router)
+
+
+    # migrate to a new strategy
+    new_strategy = strategist.deploy(strategy_contract, vault)
+    chain.mine(1)
+    chain.sleep(1)
+    #new_strategy.approveContracts({'from':gov})
+    vault.migrateStrategy(strategy, new_strategy, {"from": gov})
+    assert (
+        pytest.approx(new_strategy.estimatedTotalAssets(), rel=5e-3)
+        == amount
+    )

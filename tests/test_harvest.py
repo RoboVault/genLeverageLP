@@ -21,7 +21,7 @@ def test_profitable_harvest(
     harvest = interface.ERC20(conf['harvest_token'])
     harvestWhale = accounts.at(conf['harvest_token_whale'], True)
     sendAmount = round((vault.totalAssets() / conf['harvest_token_price']) * 0.0125)
-
+    sendAmount = int(min( sendAmount, harvest.balanceOf(harvestWhale)/5))
 
     for i in range(2):
         before_pps = vault.pricePerShare()

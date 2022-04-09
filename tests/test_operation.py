@@ -172,17 +172,26 @@ def test_reduce_debt(
     token.approve(vault.address, amount, {"from": user})
     vault.deposit(amount, {"from": user})
 
+    vault.updateStrategyDebtRatio(strategy.address, 0, {"from": gov})
+    chain.sleep(1)
+    strategy.harvest()
+    assert strategy.estimatedTotalAssets() < 10 ** (token.decimals() - 3) # near zero
+
+
+def test_reduce_debt_half(
+    chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX, conf
+):
+    #strategy.approveContracts({'from':gov})
+    # Deposit to the vault and harvest
+    token.approve(vault.address, amount, {"from": user})
+    vault.deposit(amount, {"from": user})
+
     half = int(amount / 2)
 
     vault.updateStrategyDebtRatio(strategy.address, 50_00, {"from": gov})
     chain.sleep(1)
     strategy.harvest()
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == half
-
-    vault.updateStrategyDebtRatio(strategy.address, 0, {"from": gov})
-    chain.sleep(1)
-    strategy.harvest()
-    assert strategy.estimatedTotalAssets() < 10 ** (token.decimals() - 3) # near zero
 
 
 def test_change_debt_lossy(

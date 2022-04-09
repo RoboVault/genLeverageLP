@@ -4,10 +4,18 @@ from brownie import Contract
 from brownie import interface, StrategyInsurance, project
 
  # TODO - Pull from coingecko
-LQDR_PRICE = 6.19
+LQDR_PRICE = 15
 SPOOKY_PRICE = 11.78
 SPIRIT_PRICE = 5.78
 
+WETH_PRICE = 3400
+
+
+SPOOKY_MASTERCHEF = '0x2b2929E785374c651a81A63878Ab22742656DcDd'
+BOO = '0x841FAD6EAe12c286d1Fd18d1d525DFfA75C7EFFE'
+
+lqdrMasterChef = '0x6e2ad6527901c9664f016466b8DA1357a004db0f'
+lqdr = '0x10b620b2dbAC4Faa7D7FFD71Da486f5D44cd86f9'
 
 SPIRIT_ROUTER = '0x16327E3FbDaCA3bcF7E38F5Af2599D2DDc33aE52'
 SPOOKY_ROUTER = '0xF491e7B69E4244ad4002BC14e878a34207E38c29'
@@ -40,13 +48,43 @@ CONFIG = {
         'pid': 6,
         'router': SPOOKY_ROUTER,
 
+    },
+    'WETHWFTMLINKScreamSpooky': {
+        'token': '0x74b23882a30290451A17c44f4F05243b6b58C76d',
+        'whale': '0x613BF4E46b4817015c01c6Bb31C7ae9edAadc26e',
+        'deposit': 1e6,
+        'harvest_token': '0x841FAD6EAe12c286d1Fd18d1d525DFfA75C7EFFE',
+        'harvest_token_price': SPOOKY_PRICE / WETH_PRICE,
+        'harvest_token_whale': '0xa48d959AE2E88f1dAA7D5F611E01908106dE7598',
+        'lp_token': '0x89d9bC2F2d091CfBFc31e333D6Dc555dDBc2fd29',
+        'lp_whale': '0x7F41312B5D2D31D49482F31C9a53e6485Df37E1D',
+        'lp_farm': '0x2b2929E785374c651a81A63878Ab22742656DcDd',
+        'pid': 6,
+        'router': SPOOKY_ROUTER,
+
+    },
+
+    'WETHWFTMLINKScreamLqdrSpooky': {
+        'token': '0x74b23882a30290451A17c44f4F05243b6b58C76d',
+        'whale': '0x613BF4E46b4817015c01c6Bb31C7ae9edAadc26e',
+        'deposit': 1e6,
+        'harvest_token': lqdr,
+        'harvest_token_price': LQDR_PRICE / WETH_PRICE,
+        'harvest_token_whale': lqdrMasterChef,
+        'lp_token': '0x89d9bC2F2d091CfBFc31e333D6Dc555dDBc2fd29',
+        'lp_whale': '0x7F41312B5D2D31D49482F31C9a53e6485Df37E1D',
+        'lp_farm': lqdrMasterChef,
+        'pid': 14,
+        'router': SPOOKY_ROUTER,
+
     }
+
 }
 
 
 @pytest.fixture
 def strategy_contract():
-    yield  project.GenleveragelpProject.USDCWFTMLINKScreamSpooky
+    yield  project.GenleveragelpProject.WETHWFTMLINKScreamLqdrSpooky
 
 
 @pytest.fixture
@@ -103,6 +141,10 @@ def amount(accounts, token, user, conf):
     # reserve = accounts.at("0x39B3bd37208CBaDE74D0fcBDBb12D606295b430a", force=True) # WFTM
     # reserve = accounts.at("0x2dd7C9371965472E5A5fD28fbE165007c61439E1", force=True) # USDC
     reserve = accounts.at(conf['whale'], force=True)
+    
+    whaleBalance = token.balanceOf(reserve)
+    amount = min(amount, int(0.02*whaleBalance))
+    
     token.transfer(user, amount, {"from": reserve})
     yield amount
 

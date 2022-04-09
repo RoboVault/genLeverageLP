@@ -1,7 +1,7 @@
 import pytest
 from brownie import config
 from brownie import Contract
-from brownie import interface, StrategyInsurance, project
+from brownie import interface, project
 
  # TODO - Pull from coingecko
 LQDR_PRICE = 15

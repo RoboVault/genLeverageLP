@@ -177,7 +177,7 @@ abstract contract CoreStrategy is BaseStrategy {
     // }
 
     function name() external view override returns (string memory) {
-        return "StrategyHedgedFarming";
+        return "GeneralLPHedgedFarming";
     }
 
     function _testPriceSource() internal view returns (bool) {

@@ -69,10 +69,6 @@ struct CoreStrategyConfig {
     uint256 minDeploy;
 }
 
-interface IERC20Extended is IERC20 {
-    function decimals() external view returns (uint8);
-}
-
 abstract contract CoreStrategy is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
